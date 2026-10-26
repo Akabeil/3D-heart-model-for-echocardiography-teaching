@@ -11,7 +11,7 @@ built for the UTHSC nephrology fellowship's POCUS curriculum (the Nephrology POC
 | `real-heart-probe-lab/` | Real Heart Probe Lab: every standard TTE window on one real human heart (static, diastolic) in the same chest | University of Minnesota Visible Heart Laboratories specimen HH289 |
 
 Each folder mirrors the code of its published page: `index.html` (the page and its simulator definition), `sim-engine.js`
-(PBSim, the shared probe/scan-plane engine) and, for the trainer, `bench-controls.js` (the console faders). The engine's
+(PBSim, the shared probe/scan-plane engine) and `bench-controls.js` (the console faders). The engine's
 working copy lives in the curriculum repository (`bench/sim-engine.js`); the copies here are the versions each page runs.
 three.js 0.160 (MIT) loads from jsDelivr at run time.
 
@@ -22,8 +22,7 @@ This repository is public. The data files the pages load are not, and the pages 
 - `sim-cardiac-heart.txt`: the TTESim heart volume. Used with the developer's permission for teaching; that permission is verbal and
   has not been confirmed for public redistribution.
 - `sim-heart-real.txt`: the University of Minnesota heart. © Regents of the University of Minnesota; used with permission
-  (confirmed by Dr. Kabeil, 24 Oct 2026). Keep this credit with the data wherever it goes. (The header comment in
-  `real-heart-probe-lab/index.html` predates that confirmation.)
+  (confirmed by Dr. Kabeil, 24 Oct 2026). Keep this credit with the data wherever it goes.
 - `m3d/human_thorax.glb.js` and `m3d/lung.glb.js`: simplified copies of two Sketchfab models, credited below.
 - `videos/`: the reference echo clips shown beside the trainer, some third-party and used with permission.
 

@@ -317,6 +317,102 @@ var CSS = [
 '.pb-head,.pb-views,.pb-card{animation:pbSlide var(--dur) var(--ease) backwards}.pb-views{animation-delay:60ms}.pb-card{animation-delay:120ms}',
 '@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}'
 ].join('\n');
+/* ================= HARDWARE SKIN (2026-10-24, Dr. Kabeil: "restyle the 3D simulator pages the same way").
+   The same moulded-hardware look as the in-book simulators (pbconsole.css, .machine.hw): light plastic (graphite in the dark theme),
+   raised keys that press in, recessed trays, dark glass for the image, the 3D view and the coach, the Bench's rose for lit keys (never red).
+   Only the machine parts wear it: the scanner pane, the 3D pane and the probe-control panel. The header, view chips and notes stay page cards.
+   Scope: .pb.pb-hw (create() sets it). UI only: no model, view, scoring or coach logic changed. */
+var HW_CSS = [
+'.pb.pb-hw{--hw-chassis:#e0e5ec;--hw-panel:#e8ecf2;--hw-recess:#d3dae4;--hw-ink:#2d3436;--hw-label:#4a5568;--hw-edge:#babecc;--hw-hi:#ffffff;--hw-edge-deep:#a3b1c6;--hw-rim:rgba(255,255,255,.65);',
+'  --hw-key-hi:#f2f5f9;--hw-key-lo:#d9dfe7;--hw-accent:#8E2D3B;--hw-lit:#E58A98;--hw-lit-hi:#F2A8B3;--hw-lit-ink:#2A0E14;--hw-amber:#F0B429;--hw-amber-hi:#F7CC62;--hw-amber-ink:#2A1C05;',
+'  --hw-glow:rgba(255,255,255,.5);--hw-glass:#0f1215;--hw-lcd:#0b0e11;--hw-lcd-ink:#78D2C4;--hw-screw:#c9d0da;--hw-emboss:0 1px 0 rgba(255,255,255,.85);--hw-ease:cubic-bezier(.175,.885,.32,1.275);',
+'  --hw-sh-card:8px 8px 18px var(--hw-edge),-8px -8px 18px var(--hw-hi);--hw-sh-key:4px 4px 9px var(--hw-edge),-4px -4px 9px var(--hw-hi),inset 1px 1px 0 rgba(255,255,255,.55);',
+'  --hw-sh-mini:2px 2px 5px var(--hw-edge),-2px -2px 5px var(--hw-hi),inset 1px 1px 0 rgba(255,255,255,.5);--hw-sh-press:inset 4px 4px 8px var(--hw-edge),inset -4px -4px 8px var(--hw-hi);',
+'  --hw-sh-recess:inset 3px 3px 7px var(--hw-edge),inset -3px -3px 7px var(--hw-hi);--hw-sh-glass:-2px -2px 5px var(--hw-hi),3px 3px 7px var(--hw-edge),inset 0 2px 6px rgba(0,0,0,.55);',
+'  --hw-lit-sh:inset 3px 3px 6px rgba(120,30,45,.38),inset -2px -2px 5px rgba(255,214,220,.5),0 0 14px rgba(229,138,152,.45);--hw-amber-sh:inset 3px 3px 6px rgba(120,80,0,.38),inset -2px -2px 5px rgba(255,236,190,.5),0 0 14px rgba(240,180,41,.45);',
+'  --hw-noise:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27160%27 height=%27160%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.9%27 numOctaves=%272%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .07 0%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23n)%27/%3E%3C/svg%3E")}',
+'@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pb.pb-hw{--hw-chassis:#2a2f36;--hw-panel:#30353d;--hw-recess:#23272d;--hw-ink:#e6e9ee;--hw-label:#aab3bf;--hw-edge:#1b1e23;--hw-hi:#3a4049;--hw-edge-deep:#15181c;--hw-rim:rgba(255,255,255,.07);--hw-key-hi:#363c45;--hw-key-lo:#2a2f36;--hw-accent:#F2A8B3;--hw-screw:#4a515b;--hw-emboss:0 1px 2px rgba(0,0,0,.55);--hw-glow:rgba(255,255,255,.05)}}',
+':root[data-theme="dark"] .pb.pb-hw{--hw-chassis:#2a2f36;--hw-panel:#30353d;--hw-recess:#23272d;--hw-ink:#e6e9ee;--hw-label:#aab3bf;--hw-edge:#1b1e23;--hw-hi:#3a4049;--hw-edge-deep:#15181c;--hw-rim:rgba(255,255,255,.07);--hw-key-hi:#363c45;--hw-key-lo:#2a2f36;--hw-accent:#F2A8B3;--hw-screw:#4a515b;--hw-emboss:0 1px 2px rgba(0,0,0,.55);--hw-glow:rgba(255,255,255,.05)}',
+/* chassis: the scanner pane, the 3D pane and the probe panel are moulded modules with corner screws */
+'.pb.pb-hw .pb-pane,.pb.pb-hw .pb-card.pb-ctl{color:var(--hw-ink);border:1px solid var(--hw-rim);border-radius:18px;padding:14px;overflow:visible;box-shadow:var(--hw-sh-card);-webkit-backdrop-filter:none;backdrop-filter:none;',
+'  background-color:var(--hw-chassis);background-image:',
+'  radial-gradient(circle at 11px 11px,rgba(0,0,0,.28) 0 1px,var(--hw-screw) 1.2px 3.2px,var(--hw-edge-deep) 3.4px 4.2px,transparent 4.6px),',
+'  radial-gradient(circle at calc(100% - 11px) 11px,rgba(0,0,0,.28) 0 1px,var(--hw-screw) 1.2px 3.2px,var(--hw-edge-deep) 3.4px 4.2px,transparent 4.6px),',
+'  radial-gradient(circle at 11px calc(100% - 11px),rgba(0,0,0,.28) 0 1px,var(--hw-screw) 1.2px 3.2px,var(--hw-edge-deep) 3.4px 4.2px,transparent 4.6px),',
+'  radial-gradient(circle at calc(100% - 11px) calc(100% - 11px),rgba(0,0,0,.28) 0 1px,var(--hw-screw) 1.2px 3.2px,var(--hw-edge-deep) 3.4px 4.2px,transparent 4.6px),',
+'  radial-gradient(120% 70% at 10% 0%,var(--hw-glow),rgba(255,255,255,0) 55%),var(--hw-noise);',
+'  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,repeat;background-size:auto,auto,auto,auto,auto,160px 160px}',
+'.pb.pb-hw :focus-visible{outline:2px solid var(--hw-lit);outline-offset:3px}',
+/* scanner pane: console on the chassis, LCD strip, the image behind dark glass */
+'.pb.pb-hw .pbc.pbc-console{background:transparent;color:var(--hw-ink);border:0;border-radius:0;box-shadow:none;overflow:visible}',
+'.pb.pb-hw .pbc.pbc-console .pbc-strip{margin:0 0 10px;border-radius:9px;border:1px solid var(--hw-edge-deep);color:#9aa4b1;box-shadow:var(--hw-sh-glass);',
+'  background:linear-gradient(rgba(255,255,255,0) 50%,rgba(0,0,0,.22) 50%) 0 0/100% 4px,var(--hw-lcd)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-screen{padding:10px;border-radius:13px;background:var(--hw-glass);border:1px solid var(--hw-edge-deep);box-shadow:var(--hw-sh-glass)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-screen .pb-cv{border-radius:4px}',
+'.pb.pb-hw .pbc-hint{background:transparent;border-top:0;padding:7px 4px 0;color:var(--hw-label);font:700 10.5px/1.3 var(--font-mono);letter-spacing:.11em;text-transform:uppercase;text-shadow:var(--hw-emboss)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-panel,.pb.pb-hw .pb-tb{background:transparent;border-top:0;padding:12px 2px 4px;gap:12px 10px}',
+'.pb.pb-hw .pbc.pbc-console .pbc-cl+.pbc-cl{padding-left:10px;border-left:1px solid var(--hw-edge);box-shadow:inset 1px 0 0 var(--hw-hi)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-moderow{margin:6px 0 2px;border-radius:12px;background:var(--hw-recess);border-top:0;box-shadow:var(--hw-sh-recess),inset 4px 0 0 var(--hw-lit);padding:12px 12px 12px 16px}',
+'.pb.pb-hw .pbc.pbc-console .pbc-step small,.pb.pb-hw .pbc.pbc-console .pbc-sel small,.pb.pb-hw .pbc.pbc-console .pbc-grp>h4{font-family:var(--font-mono);font-weight:700;letter-spacing:.11em;color:var(--hw-label);text-shadow:var(--hw-emboss)}',
+/* keys: raised moulded caps; pressed = the shadow reverses; latched = pressed and backlit rose; freeze = backlit amber */
+'.pb.pb-hw .pbc.pbc-console .pbc-key,.pb.pb-hw .pb-tb>button,.pb.pb-hw .pbc-keys>button,.pb.pb-hw .pb-ctl .pb-btn.alt{background:linear-gradient(145deg,var(--hw-key-hi),var(--hw-key-lo));color:var(--hw-ink);border:1px solid var(--hw-rim);',
+'  border-radius:10px;box-shadow:var(--hw-sh-key);font:700 12.5px/1 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;transition:transform .2s var(--hw-ease),box-shadow .2s ease}',
+'.pb.pb-hw .pb-ctl .pb-btn.alt{color:var(--hw-accent)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-key:hover,.pb.pb-hw .pb-tb>button:hover:not(:disabled),.pb.pb-hw .pbc-keys>button:hover,.pb.pb-hw .pb-ctl .pb-btn:hover:not(:disabled){background:linear-gradient(145deg,var(--hw-key-hi),var(--hw-key-lo));transform:translateY(-1px);box-shadow:var(--hw-sh-key)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-key:active,.pb.pb-hw .pb-tb>button:active,.pb.pb-hw .pbc-keys>button:active,.pb.pb-hw .pb-ctl .pb-btn:active{transform:translateY(1px);box-shadow:var(--hw-sh-press)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-key[aria-pressed="true"],.pb.pb-hw .pb-tb>button[aria-pressed="true"],.pb.pb-hw .pbc-keys>button[aria-pressed="true"],.pb.pb-hw .pbc.pbc-console .pbc-key.on,.pb.pb-hw .pb-ctl .pb-btn:not(.alt),.pb.pb-hw .pb-ctl .pb-btn:not(.alt):hover:not(:disabled){',
+'  background:linear-gradient(145deg,var(--hw-lit-hi),var(--hw-lit));color:var(--hw-lit-ink);border-color:rgba(255,255,255,.35);box-shadow:var(--hw-lit-sh);transform:translateY(1px)}',
+'.pb.pb-hw .pb-ctl .pb-btn{border-radius:10px;font:700 12.5px/1 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;transition:transform .2s var(--hw-ease),box-shadow .2s ease}',
+'.pb.pb-hw .pb-ctl .pb-btn:not(.alt){transform:none}',
+'.pb.pb-hw .pbc.pbc-console .pbc-key.frz{background:linear-gradient(145deg,var(--hw-amber-hi),var(--hw-amber))!important;color:var(--hw-amber-ink)!important;border-color:rgba(255,255,255,.35)!important;box-shadow:var(--hw-amber-sh);transform:translateY(1px)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-more.open{box-shadow:var(--hw-sh-press);color:var(--hw-accent);transform:translateY(1px)}',
+'.pb.pb-hw .pb-tb>button:disabled{opacity:.42;transform:none}',
+/* LEDs on the latching scanner keys (FREEZE, CALIPERS, the imaging modes): dark when off, lit when on */
+'.pb.pb-hw .pbc.pbc-console .frz-key::before,.pb.pb-hw .pbc.pbc-console #pb-calip::before,.pb.pb-hw .pbc.pbc-console .pbc-modes .pbc-key::before{content:"";display:inline-block;vertical-align:middle;width:6px;height:6px;margin:-2px 7px 0 0;border-radius:50%;background:var(--hw-edge-deep);box-shadow:inset 0 1px 1px rgba(0,0,0,.35)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-key[aria-pressed="true"]::before{background:#fff;box-shadow:0 0 6px 1px rgba(255,255,255,.9)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-key.frz::before{background:#fff8e1;box-shadow:0 0 6px 1px rgba(255,248,225,.9)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-modes{gap:5px;padding:5px;border-radius:13px;background:var(--hw-recess);box-shadow:var(--hw-sh-recess)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-modes .pbc-key,.pb.pb-hw .pbc.pbc-console .pbc-modes .pbc-key:first-child,.pb.pb-hw .pbc.pbc-console .pbc-modes .pbc-key:last-child{border-radius:9px;margin-left:0;box-shadow:var(--hw-sh-mini)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-modes .pbc-key[aria-pressed="true"]{box-shadow:var(--hw-lit-sh)}',
+/* steppers: a recessed tray, two small raised keys and an LCD window */
+'.pb.pb-hw .pbc.pbc-console .pbc-sbox{gap:5px;padding:5px;border:0;border-radius:13px;background:var(--hw-recess);box-shadow:var(--hw-sh-recess);overflow:visible}',
+'.pb.pb-hw .pbc.pbc-console .pbc-sbox button{width:40px;min-height:40px;border-radius:9px;color:var(--hw-ink);background:linear-gradient(145deg,var(--hw-key-hi),var(--hw-key-lo));border:1px solid var(--hw-rim);box-shadow:var(--hw-sh-mini);transition:transform .2s var(--hw-ease),box-shadow .2s}',
+'.pb.pb-hw .pbc.pbc-console .pbc-sbox button:hover{background:linear-gradient(145deg,var(--hw-key-hi),var(--hw-key-lo));transform:translateY(-1px)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-sbox button.held,.pb.pb-hw .pbc.pbc-console .pbc-sbox button:active{box-shadow:var(--hw-sh-press);transform:translateY(1px)}',
+'.pb.pb-hw .pbc.pbc-console .pbc-sbox button:disabled{opacity:.4;transform:none;box-shadow:none;background:transparent}',
+'.pb.pb-hw .pbc.pbc-console .pbc-sbox output{border:1px solid var(--hw-edge-deep);border-radius:8px;background:var(--hw-lcd);color:var(--hw-lcd-ink);box-shadow:inset 0 2px 5px rgba(0,0,0,.6)}',
+/* selectors: raised keys with a drop arrow */
+'.pb.pb-hw .pbc.pbc-console .pbc-sel select,.pb.pb-hw .pb-hwp .pb-sel,.pb.pb-hw .pbc-grp .pb-sel{-webkit-appearance:none;appearance:none;min-height:44px;padding:0 34px 0 12px;border:1px solid var(--hw-rim);border-radius:10px;color:var(--hw-ink);box-shadow:var(--hw-sh-key);font:600 13.5px/1.2 var(--font-body);cursor:pointer;',
+'  background:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27 viewBox=%270 0 12 8%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 fill=%27none%27 stroke=%27%238896a8%27 stroke-width=%272%27/%3E%3C/svg%3E") no-repeat right 12px center,linear-gradient(145deg,var(--hw-key-hi),var(--hw-key-lo))}',
+'.pb.pb-hw .pbc.pbc-console .pbc-sel select:hover{background-color:transparent}',
+'.pb.pb-hw select option{background:var(--hw-chassis);color:var(--hw-ink)}',
+/* More drawer: a recessed bay */
+'.pb.pb-hw .pbc.pbc-console .pbc-drawer{margin:6px 0 4px;border-radius:15px;border-top:0;background:var(--hw-recess);box-shadow:var(--hw-sh-recess);padding:14px}',
+'.pb.pb-hw .pbc-grp .pb-sl label,.pb.pb-hw .pbc-grp .pb-field{color:var(--hw-ink)}.pb.pb-hw .pbc-grp p{color:var(--hw-label)}',
+/* sliders and readouts on any hardware panel */
+'.pb.pb-hw .pb-hwp .pb-sl label{color:var(--hw-ink);font-weight:600}',
+'.pb.pb-hw .pb-hwp .pb-sl output,.pb.pb-hw .pbc-grp .pb-sl output{justify-self:end;padding:2px 7px;border-radius:6px;background:var(--hw-lcd);color:var(--hw-lcd-ink);border:1px solid var(--hw-edge-deep);box-shadow:inset 0 2px 4px rgba(0,0,0,.6);font-size:12.5px}',
+/* the coach and the measurement line: dark glass below the console */
+'.pb.pb-hw .pb-img>.pb-coach{margin-top:10px;border:1px solid var(--hw-edge-deep);border-radius:12px;background:var(--hw-glass);box-shadow:var(--hw-sh-glass);color:var(--scr-ink);padding:10px 12px}',
+'.pb.pb-hw .pb-img>.pb-meas{margin-top:10px;padding:8px 12px;border:1px solid var(--hw-edge-deep);border-radius:10px;background:var(--hw-glass);box-shadow:var(--hw-sh-glass)}.pb.pb-hw .pb-img>.pb-meas:empty{display:none}',
+/* 3D pane: a stamped title, the scene behind dark glass, tool keys */
+'.pb.pb-hw .pb-3d .pb-ph{background:transparent;border-bottom:0;padding:0 4px 10px}',
+'.pb.pb-hw .pb-ph h2{color:var(--hw-ink);font-family:var(--font-mono);font-size:12.5px;letter-spacing:.12em;text-shadow:var(--hw-emboss)}.pb.pb-hw .pb-ph span{color:var(--hw-label)}',
+'.pb.pb-hw .pb-ph h2::before{content:"";display:inline-block;vertical-align:middle;width:8px;height:8px;margin:-2px 9px 0 0;border-radius:50%;background:#3ddc84;box-shadow:0 0 7px 1px rgba(61,220,132,.55),inset 0 -1px 1px rgba(0,0,0,.3)}',
+'.pb.pb-hw .pb-stage{border-radius:13px;overflow:hidden;background:var(--hw-glass);border:1px solid var(--hw-edge-deep);box-shadow:var(--hw-sh-glass)}',
+'.pb.pb-hw .pb-3d .pb-tb{border-top:0}.pb.pb-hw .pb-nogl{color:var(--hw-label)}.pb.pb-hw .pb-penchip{color:var(--hw-label);opacity:1}',
+/* probe panel: chassis, a recessed tilt-and-rock pad with a lit puck */
+'.pb.pb-hw .pb-ctl h2{color:var(--hw-ink);text-shadow:var(--hw-emboss)}',
+'.pb.pb-hw .pb-ctl .pb-padwrap p,.pb.pb-hw .pb-ctl .pb-pen ul,.pb.pb-hw .pb-ctl .pb-muted{color:var(--hw-label)}.pb.pb-hw .pb-ctl .pb-pen summary,.pb.pb-hw .pb-ctl .pb-field{color:var(--hw-ink)}',
+'.pb.pb-hw .pb-pad{border:0;border-radius:16px;background:var(--hw-recess);box-shadow:var(--hw-sh-recess)}',
+'.pb.pb-hw .pb-pad::before,.pb.pb-hw .pb-pad::after{background:var(--hw-edge-deep)}',
+'.pb.pb-hw .pb-pad i{background:radial-gradient(circle at 35% 30%,var(--hw-lit-hi),var(--hw-lit) 60%,#c9707f);box-shadow:3px 3px 6px var(--hw-edge),-2px -2px 5px var(--hw-hi),0 0 10px rgba(229,138,152,.45)}',
+/* maker's plate under the scanner */
+'.pb.pb-hw .pb-plate{display:flex;align-items:center;gap:12px;margin:10px 2px 0;font:700 9.5px/1.2 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--hw-label);text-shadow:var(--hw-emboss)}',
+'.pb.pb-hw .pb-plate::before{content:"";flex:0 0 auto;width:52px;height:9px;margin-right:auto;border-radius:5px;background:repeating-linear-gradient(90deg,var(--hw-edge-deep) 0 4px,transparent 4px 8px);box-shadow:inset 1px 1px 2px rgba(0,0,0,.25);opacity:.8}',
+'@media (prefers-reduced-motion:reduce){.pb.pb-hw .pbc.pbc-console .pbc-key,.pb.pb-hw .pb-tb>button,.pb.pb-hw .pbc-keys>button,.pb.pb-hw .pbc.pbc-console .pbc-sbox button,.pb.pb-hw .pb-ctl .pb-btn{transition:none}}'
+].join('\n');
+
 var MARK = '<svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true"><path d="M60 8C82 8 94 28 93 50C92 74 76 92 56 92C41 92 33 82 37 71C40 63 49 60 49 50C49 40 40 37 37 29C33 18 44 8 60 8Z" fill="var(--teal)"/><path d="M4 70C16 70 22 50 34 50H49" fill="none" stroke="var(--sun)" stroke-width="7" stroke-linecap="round"/></svg>';
 var DISCLAIMER = 'Educational simulation with modelled anatomy. Not a diagnostic device.';
 function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -325,7 +421,7 @@ function el(tag, attrs, html) { var e = document.createElement(tag); if (attrs) 
 /* ================================================================== create */
 function create(cfg) {
   var mount = typeof cfg.mount === 'string' ? document.querySelector(cfg.mount) : (cfg.mount || document.body);
-  if (!document.getElementById('pb-css')) { var sty = el('style', { id: 'pb-css' }); sty.textContent = CSS; document.head.appendChild(sty); }
+  if (!document.getElementById('pb-css')) { var sty = el('style', { id: 'pb-css' }); sty.textContent = CSS + '\n' + HW_CSS; document.head.appendChild(sty); }
   if (!document.querySelector('link[href*="Cormorant+Garamond"]')) { var fl = el('link', { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Figtree:wght@400;500;600;700&family=Red+Hat+Mono:wght@400;500;600&display=swap' }); document.head.appendChild(fl); }   // brand fonts, for a host page that still links the old ones
   var qs; try { qs = new URLSearchParams(location.search); } catch (e) { qs = { get: function () { return null; } }; }
   var EMBED = !!qs.get('embed') || location.hash === '#embed';
@@ -467,6 +563,7 @@ function create(cfg) {
       mm /= n; for (j2 = 0; j2 < n; j2++) f[j2] /= mm; return f;
     };
     stF = streak(4, 1.0, 1.7, 6, 3, 1.0); stM = streak(3, 0.9, 1.3, 8, 2, 0.6);   // lateral box radius 4 / 3 lines, no axial blur: grain aspect ~8:1 (fat) and ~5:1 (muscle) on the linear probe
+    if (cfg.imageLayer && cfg.imageLayer.ok) { spk.fill(1); mot.fill(1); }   // calculated image layer (sim-physimage.js) supplies patient-fixed speckle instead
     lutKey = '';
   }
   function buildLUT() {
@@ -587,6 +684,12 @@ function create(cfg) {
           if (flowAt(x, y, z, t, S, id, fv)) { var vb = -(fv[0] * ex + fv[1] * ey + fv[2] * ez); if (Math.abs(vb) > wf) { var av = vb / ny; av = ((av + 1) % 2 + 2) % 2 - 1; cv[k0 + j] = av || 0.001; } }
         }
       }
+    }
+    /* calculated image layer (opt-in): replaces only the step from pol to pixels; on failure the engine's own speckle comes back */
+    var IL = cfg.imageLayer;
+    if (IL && IL.ok && !colour) {
+      if (IL.draw({ pol: pol, ids: ids, NL: NL, NS: NS, G: G, pose: pose, st: st, t: t, EW: EW, EH: EH, TOP: TOP, ppv: ppv, MS: MS, bx: bx })) { drawOverlay(); return; }
+      allocQ(); buildLUT(); dirty2 = true; return;
     }
     /* scan conversion */
     var data = img.data, p, i; data.fill(0); for (i = 3; i < data.length; i += 4) data[i] = 255;
@@ -1059,7 +1162,7 @@ function create(cfg) {
   /* ---------------- UI */
   var ui = {}, sliders = {};
   function buildUI() {
-    var wrap = el('div', { class: 'pb' + (EMBED ? ' pb-embed' : '') });
+    var wrap = el('div', { class: 'pb' + (EMBED ? ' pb-embed' : '') + (cfg.hw === false ? '' : ' pb-hw') });
     var head = el('header', { class: 'pb-head' });
     head.innerHTML = '<div class="pb-lock">' + MARK + '<div><div class="pb-eyebrow">Kabeil Nephrology · POCUS Bench</div><h1>' + esc(cfg.title) + '</h1></div></div>';
     ui.modes = el('div', { class: 'pb-seg', role: 'group', 'aria-label': 'Mode' });
@@ -1094,7 +1197,8 @@ function create(cfg) {
         '<section class="pbc-grp" id="pbc-g-anat" hidden><h4>' + esc((cfg.anatomy && cfg.anatomy.group) || 'Anatomy model') + '</h4><div class="pb-sliders" id="pbc-sl-anat"></div><p>' + ((cfg.anatomy && cfg.anatomy.note) || 'Context only: the image is computed from the simulator’s own simplified anatomy, so the model’s ribs and organs may not line up exactly with the image.') + '</p></section>' +
       '</div></div>' +
       '<div class="pb-meas" id="pb-meas"></div>' +
-      '<div class="pb-coach" aria-label="View coach"><div class="pb-bar" id="pb-bar-n"><span>Plane tilt</span><div class="trk"><i></i><b></b></div><span class="val"></span></div><div class="pb-bar" id="pb-bar-r"><span>In-plane</span><div class="trk"><i></i><b></b></div><span class="val"></span></div><div class="pb-bar" id="pb-bar-p"><span>Position</span><div class="trk"><i></i><b></b></div><span class="val"></span></div><ul class="pb-req" id="pb-req"></ul><div class="pb-hold"><i id="pb-hold"></i></div><p class="pb-hint" id="pb-hint" aria-live="polite"></p></div>';
+      '<div class="pb-coach" aria-label="View coach"><div class="pb-bar" id="pb-bar-n"><span>Plane tilt</span><div class="trk"><i></i><b></b></div><span class="val"></span></div><div class="pb-bar" id="pb-bar-r"><span>In-plane</span><div class="trk"><i></i><b></b></div><span class="val"></span></div><div class="pb-bar" id="pb-bar-p"><span>Position</span><div class="trk"><i></i><b></b></div><span class="val"></span></div><ul class="pb-req" id="pb-req"></ul><div class="pb-hold"><i id="pb-hold"></i></div><p class="pb-hint" id="pb-hint" aria-live="polite"></p></div>' +
+      '<div class="pb-plate">Nephrology POCUS Bench · © 2026 Ahmed Kabeil, MD</div>';
     grid.appendChild(pi);
     /* 3D pane */
     var p3 = el('section', { class: 'pb-pane pb-3d', 'aria-label': '3D probe and scan plane' });
@@ -1104,16 +1208,18 @@ function create(cfg) {
       '<span class="pb-penchip" id="pb-penchip" hidden>Pencil ready · touch the skin to scan</span></div>';
     grid.appendChild(p3);
     /* controls */
-    var pc = el('section', { class: 'pb-card pb-ctl', 'aria-label': 'Probe controls' });
+    var pc = el('section', { class: 'pb-card pb-ctl pb-hwp', 'aria-label': 'Probe controls' });
     pc.innerHTML = '<h2>Probe controls</h2><div class="pb-sliders" id="pb-sliders"></div><div class="pb-padwrap"><div class="pb-pad" id="pb-pad" aria-hidden="true"><i></i></div><p>Tilt and rock pad: drag up or down to fan, left or right to rock. In the 3D pane, turn on “Move probe” to drag the probe over the skin; twist with two fingers (or scroll) to rotate.</p></div><details class="pb-pen"><summary>Apple Pencil (iPad)</summary><ul><li>Touch the skin in the 3D pane with the Pencil tip: the probe goes there and follows the tip. Fingers still orbit and pinch.</li><li>Lean the Pencil to fan (toward or away from you) and rock (left or right). Angles count from how you held it at touch-down.</li><li>Press harder to compress: veins and the IVC flatten; on cardiac and abdominal windows firmer contact also brightens the image. Lift off to release.</li><li>Pencil Pro: hover shows where the probe will land; barrel roll rotates the probe where the browser reports it. Squeeze and haptics need the native app.</li></ul></details>' +
       '<div class="pb-row"><label class="pb-field" for="pb-probe">Probe<select class="pb-sel" id="pb-probe"></select></label><button type="button" class="pb-btn" id="pb-show">Show me</button><button type="button" class="pb-btn alt" id="pb-reset">Reset probe</button></div><div id="pb-params" class="pb-sliders" style="margin-top:10px"></div>';
     grid.appendChild(pc);
     ui.notes = el('section', { class: 'pb-card pb-notes', 'aria-label': 'Teaching notes' }); grid.appendChild(ui.notes);
     wrap.appendChild(grid);
-    var foot = el('footer', { class: 'pb-foot' }, '<p><b>' + DISCLAIMER + '</b></p><p>Images are parametric models, not recordings, and have not been checked against real clips. Findings are composite teaching archetypes, not patients. Scores are practice feedback only. <span class="pb-prog" id="pb-prog"></span></p>' + (cfg.footer ? '<p>' + cfg.footer + '</p>' : '') + (cfg.anatomy ? '<p class="pb-mcred" id="pb-mcredline"></p>' : ''));
+    var foot = el('footer', { class: 'pb-foot' }, '<p><b>' + DISCLAIMER + '</b></p><p>Images are parametric models, not recordings, and have not been checked against real clips. Findings are composite teaching archetypes, not patients. Scores are practice feedback only. <span class="pb-prog" id="pb-prog"></span></p>' + (cfg.footer ? '<p>' + cfg.footer + '</p>' : '') + '<p class="pb-copy">© 2026 Ahmed Kabeil, MD · original simulator for the Nephrology POCUS Bench. Anatomy data and 3D models keep their own credits above.</p>' + (cfg.anatomy ? '<p class="pb-mcred" id="pb-mcredline"></p>' : ''));
     wrap.appendChild(foot); mount.appendChild(wrap);
-    /* every slider becomes a console fader (bench-controls.js): dark on a scanner pane, brand on a card */
-    var fade = function () { if (window.PBControls) window.PBControls.enhance(wrap, { tone: function (r) { return r.closest('.pb-pane') ? 'dark' : 'page'; } }); };
+    /* every slider becomes a console fader (bench-controls.js): moulded hardware on the machine parts, brand on a page card */
+    var fade = function () { if (window.PBControls) window.PBControls.enhance(wrap, { tone: function (r) {
+      if (wrap.classList.contains('pb-hw') && r.closest('.pbc-drawer, .pb-hwp')) return 'hw';   /* hardware skin: the More drawer and the probe panel; sliders on dark glass stay dark */
+      return r.closest('.pb-pane') ? 'dark' : 'page'; } }); };
     fade(); try { new MutationObserver(function () { fade(); }).observe(wrap, { childList: true, subtree: true }); } catch (er) {}
     var $ = function (id) { return document.getElementById(id); };
     bm = $('pb-bm'); bx = bm.getContext('2d'); img = bx.createImageData(EW, EH); sc = $('pb-strip'); sx = sc.getContext('2d');
