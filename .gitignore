@@ -1,0 +1,8 @@
+# Data the pages load but this public repository does not hold (see README)
+*.txt
+!requirements*.txt
+m3d/
+videos/
+*.glb
+*.glb.js
+*.mp4
