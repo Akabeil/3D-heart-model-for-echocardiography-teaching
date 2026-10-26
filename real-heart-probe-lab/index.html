@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Real Heart Probe Lab</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Figtree:wght@400;500;600;700&family=Red+Hat+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: PBSim instrument (image + coach | 3D probe, plane and real heart), then a probe-position assistant card and model notes.
+   Tokens and component styles are injected by sim-engine.js; this block styles the first paint, the loader and the cards this page adds. */
+html{background:#E6D3D4;color:#2A1417}
+@media (prefers-color-scheme:dark){html:not([data-theme="light"]){background:#1B1013;color:#F3E7E8}html:not([data-theme="light"]) #hr-bar i{background:#E58A98}}
+html[data-theme="dark"]{background:#1B1013;color:#F3E7E8}html[data-theme="dark"] #hr-bar i{background:#E58A98}
+#hr-load{font:16px/1.5 "Figtree",system-ui,sans-serif;max-width:520px;margin:18vh auto 0;padding:0 16px;text-align:center}
+#hr-load b{display:block;font:600 27px/1.1 "Cormorant Garamond",Georgia,serif;margin-bottom:8px}
+#hr-bar{height:6px;border-radius:3px;background:rgba(120,140,145,.28);overflow:hidden;margin:14px auto 0;max-width:280px}
+#hr-bar i{display:block;height:100%;width:0;background:#8E2D3B}
+#hr-asst h3,#hr-notes h3{font-family:var(--font-display);font-weight:600;font-size:19px;margin:12px 0 6px}
+#hr-asst .as-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;align-items:start}
+#hr-asst .as-where{font-size:15.5px;line-height:1.5}
+#hr-asst .as-where b{font-weight:600}#hr-asst .as-where b.n{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+#hr-asst table{border-collapse:collapse;width:100%;font-size:14.5px}
+#hr-asst td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+#hr-asst td.n{font-family:var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+#hr-asst .bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;min-width:60px}
+#hr-asst .bar i{display:block;height:100%;background:var(--teal)}
+#hr-asst .ok{color:var(--sun-text);font-weight:600}
+#hr-asst .chk{display:flex;gap:10px;align-items:center;min-height:44px;cursor:pointer;font-weight:600}
+#hr-asst .chk input{width:22px;height:22px;accent-color:var(--teal)}
+#hr-asst .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:13.5px}
+#hr-asst .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+#hr-notes summary{cursor:pointer;font-family:var(--font-display);font-weight:600;font-size:21px;line-height:1.15;min-height:44px;display:flex;align-items:center}
+#hr-notes ul{margin:0;padding-left:20px;max-width:74ch}#hr-notes li{margin:3px 0}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="app"><div id="hr-load"><b>Real Heart Probe Lab</b><span id="hr-msg">Loading the heart model…</span><div id="hr-bar"><i id="hr-fill"></i></div></div></div>
+<noscript><p style="padding:16px">This simulator needs JavaScript. Educational simulation with modelled anatomy. Not a diagnostic device.</p></noscript>
+<script src="sim-engine.js"></script>
+<script>
+/* sim-heart-real — Bench session s4 companion: every standard TTE window on a REAL human heart. Built on PBSim (sim-engine.js).
+   World mm: x = patient left, y = superior, z = anterior (PBSim convention).
+   HEART: one perfusion-fixed human heart from the University of Minnesota Visible Heart Laboratories (specimen HH289), supplied as five
+   3D-printable TEE teaching sets cut from the same scan. The four pieces of the ME four-/two-chamber set were reassembled in their common frame,
+   voxelised by ray parity (0.6 mm), chambers derived as enclosed blood (LV, LA, RV, RA split at the valve necks by watershed; aorta and pulmonary
+   trunk from their own lumens), thin tissue within 14-18 mm of each valve centre labelled as valve, then resampled to 0.7 mm.
+   The heart is placed rigidly (no scaling) onto the landmark positions of the Bench's TTESim heart (MV, TV, AV, PV, apex, chamber centres;
+   residual 4-14 mm) so the chest wall, ribs, lungs, liver and spine below are the same procedural torso as sim-cardiac.
+   It is static: one fixed (diastolic) shape, no motion. Licence: (c) Regents of the University of Minnesota; permission needed before release.
+   Data file sim-heart-real.txt = base64(gzip(TIS | LAB | HD)), uint8 each, C-order [x][y][z] in the heart's own frame:
+   TIS smoothed tissue density (0-255, tissue > 128), LAB 1 RA 2 LA 3 RV 4 LV 5 great vessel 6 valve, HD distance outside the heart (0.25 mm units). */
+(function () {
+'use strict';
+var P = window.PBSim, V = P.V, nrm = V.nrm, add = V.add, sub = V.sub, mul = V.mul, dot = V.dot, cross = V.cross, D2R = Math.PI / 180, R2D = 180 / Math.PI;
+
+/* ---------------- heart volume and placement */
+var NX = 203, NY = 204, NZ = 196, HV = 0.7, LO = [-70.052, -6.332, -51.753], SJ = NZ, SI = NY * NZ, NN = NX * NY * NZ;
+var RM = [[0.99205, -0.10478, 0.06972], [0.02309, 0.69611, 0.71757], [-0.12372, -0.71025, 0.69299]], TT = [29.668, -62.837, 69.603];   // world = RM . local + TT
+var POSE = {"plax":{"O":[25.4292,-34.5,111.5637],"n":[0.1733,0.1007,-0.9797],"u":[-0.6752,0.7363,-0.0438]},"rvit":{"O":[25.4292,-34.5,111.5637],"n":[-0.232,0.0006,-0.9727],"u":[-0.5831,0.8003,0.1396]},"psax-av":{"O":[25.4292,-34.5,111.5637],"n":[-0.1002,0.3767,-0.9209],"u":[0.717,0.669,0.1956]},"psax-mv":{"O":[25.4292,-34.5,111.5637],"n":[0.1552,0.1204,-0.9805],"u":[0.717,0.6691,0.1956]},"psax-pm":{"O":[25.4292,-34.5,111.5637],"n":[0.333,-0.0822,-0.9393],"u":[0.717,0.6691,0.1956]},"psax-ap":{"O":[25.4292,-34.5,111.5637],"n":[0.4855,-0.2779,-0.8289],"u":[0.717,0.6691,0.1956]},"a4c":{"O":[99.3113,-106.8367,88.5978],"n":[-0.5886,0.6162,-0.5233],"u":[0.8005,0.3535,-0.484]},"a5c":{"O":[99.3113,-106.8367,88.5978],"n":[-0.5615,0.7188,-0.41],"u":[0.8022,0.3513,-0.4828]},"a3c":{"O":[99.3113,-106.8367,88.5978],"n":[-0.5141,0.6965,-0.5006],"u":[-0.4711,0.2585,0.8434]},"a2c":{"O":[99.3113,-106.8367,88.5978],"n":[-0.5049,0.5406,-0.673],"u":[0.263,0.8388,0.4766]},"subx":{"O":[2.26,-114.22,112.9887],"n":[0.1158,0.6867,-0.7177],"u":[0.9874,-0.1583,0.0078]},"ivc":{"O":[-5.65,-114.22,112.9295],"n":[0.0284,0.5322,-0.8462],"u":[-0.013,0.8466,0.532]}};
+var LM = {"MV":[36.4,-15.8,7.4],"TV":[1.4,-29.5,26.8],"AV":[16.3,-0.2,27.7],"PV":[24.1,7.8,56.5],"LV":[50.3,-31.7,24.6],"RV":[13.0,-39.4,43.5],"LA":[19.5,5.8,1.3],"RA":[-16.1,-10.5,20.1],"AO":[5.9,28.2,36.2],"PA":[26.3,30.0,44.7],"APEX":[73.0,-68.7,54.6]};
+var LVAX = nrm(sub(LM.APEX, LM.MV));
+var IVCJ = [-2.3, -38.2, 15.9];
+var LINES = {
+  IVC: [IVCJ, add(IVCJ, [0, -60, -8]), add(IVCJ, [-2, -120, -18])],
+  DAo: [[29.9, -62.3, -39.3], [31.2, -44.9, -39.8], [33.8, -19.3, -39.4], [35.1, 5.8, -37.7], [33.8, 32.3, -26.8], [32.5, 55.3, -14.6], [27.3, 70.2, -0.5]]
+};
+function toLocal(p) { var d = [p[0] - TT[0], p[1] - TT[1], p[2] - TT[2]]; return [RM[0][0] * d[0] + RM[1][0] * d[1] + RM[2][0] * d[2], RM[0][1] * d[0] + RM[1][1] * d[1] + RM[2][1] * d[2], RM[0][2] * d[0] + RM[1][2] * d[1] + RM[2][2] * d[2]]; }
+function dirLocal(d) { return [RM[0][0] * d[0] + RM[1][0] * d[1] + RM[2][0] * d[2], RM[0][1] * d[0] + RM[1][1] * d[1] + RM[2][1] * d[2], RM[0][2] * d[0] + RM[1][2] * d[1] + RM[2][2] * d[2]]; }
+
+/* ---------------- procedural torso (identical to sim-cardiac, so windows, ribs and lungs behave the same) */
+var RA = 160, RB = 113, YB = -250, YT = 175, IA2 = 1 / (RA * RA), IB2 = 1 / (RB * RB), IA4 = IA2 * IA2, IB4 = IB2 * IB2, WALL = 20;
+var RIB_P = 30, RIB_W = 7, RIB_PH = 3.9, CCJ = 60, XIPH = -85, STERN = 17, SPZ = 74, SPR2 = 18 * 18;
+
+/* ---------------- tissues (id = index) */
+var TISSUES = [
+  { key: 'OUT', echo: 0, spec: 0 },
+  { key: 'SKIN', echo: 0.7, speck: 0.4, spec: 0.2 },
+  { key: 'FAT', echo: 0.09, speck: 1.2, mot: 0.9, atten: 0.9, spec: 0.16 },
+  { key: 'MUSC', echo: 0.12, speck: 1.2, mot: 0.8, spec: 0.2 },
+  { key: 'BONE', echo: 0.9, reflect: 0.97, spec: 0.9, atten: 6 },
+  { key: 'MYO', echo: 0.24, speck: 1.5, mot: 0.55, spec: 0.32 },
+  { key: 'RAB', echo: 0.004, speck: 0, atten: 0.5, spec: 0.3, flow: true },
+  { key: 'LAB', echo: 0.004, speck: 0, atten: 0.5, spec: 0.3, flow: true },
+  { key: 'RVB', echo: 0.004, speck: 0, atten: 0.5, spec: 0.3, flow: true },
+  { key: 'LVB', echo: 0.004, speck: 0, atten: 0.5, spec: 0.3, flow: true },
+  { key: 'VES', echo: 0.004, speck: 0, atten: 0.5, spec: 0.3, flow: true },
+  { key: 'PERI', echo: 0.9, speck: 0.35, spec: 0.6 },
+  { key: 'MED', echo: 0.12, mot: 0.9, atten: 0.9, spec: 0.14 },
+  { key: 'LUNG', echo: 0.7, reflect: 0.97, spec: 0.9, reverb: true, mirror: true, dirty: 0.3 },
+  { key: 'LIVER', echo: 0.21, mot: 0.35, spec: 0.22 },
+  { key: 'GAS', echo: 0.75, reflect: 0.96, spec: 0.5, dirty: 0.6 },
+  { key: 'DISC', echo: 0.3, spec: 0.3 },
+  { key: 'CART', echo: 0.03, speck: 0.3, atten: 1.5, spec: 0.3 },
+  { key: 'VALVE', echo: 0.55, speck: 0.6, spec: 0.7 }
+];
+var T = P.tissueIds(TISSUES);
+var BLOOD = [0, T.RAB, T.LAB, T.RVB, T.LVB, T.VES];
+
+/* ---------------- data */
+var TIS = null, LAB = null, HD = null;
+function load() {
+  var msg = document.getElementById('hr-msg'), fill = document.getElementById('hr-fill');
+  return fetch('sim-heart-real.txt').then(function (res) {
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var total = +res.headers.get('content-length') || 4033156, rd = res.body.getReader(), chunks = [], got = 0;
+    function pump() { return rd.read().then(function (r) { if (r.done) return; chunks.push(r.value); got += r.value.length; fill.style.width = Math.min(100, got / total * 100) + '%'; msg.textContent = 'Loading the heart model… ' + (got / 1e6).toFixed(1) + ' of ' + (total / 1e6).toFixed(1) + ' MB'; return pump(); }); }
+    return pump().then(function () {
+      msg.textContent = 'Unpacking the heart…';
+      var buf = new Uint8Array(got), o = 0; chunks.forEach(function (c) { buf.set(c, o); o += c.length; });
+      var bin = atob(new TextDecoder().decode(buf).replace(/\s+/g, '')), gz = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) gz[i] = bin.charCodeAt(i);
+      return new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    });
+  }).then(function (ab) {
+    var all = new Uint8Array(ab); if (all.length < 3 * NN) throw new Error('unexpected data size ' + all.length);
+    TIS = all.subarray(0, NN); LAB = all.subarray(NN, 2 * NN); HD = all.subarray(2 * NN, 3 * NN);
+  });
+}
+function tri(A, a0, a1, a2) {
+  var i0 = a0 | 0, i1 = a1 | 0, i2 = a2 | 0, f0 = a0 - i0, f1 = a1 - i1, f2 = a2 - i2, q = i0 * SI + i1 * SJ + i2;
+  var c00 = A[q] + (A[q + 1] - A[q]) * f2, c01 = A[q + SJ] + (A[q + SJ + 1] - A[q + SJ]) * f2, c10 = A[q + SI] + (A[q + SI + 1] - A[q + SI]) * f2, c11 = A[q + SI + SJ] + (A[q + SI + SJ + 1] - A[q + SI + SJ]) * f2;
+  var c0 = c00 + (c01 - c00) * f1, c1 = c10 + (c11 - c10) * f1; return c0 + (c1 - c0) * f0;
+}
+function nearLine(p, pts) {
+  var best = 1e9, bp = null;
+  for (var i = 0; i < pts.length - 1; i++) { var a = pts[i], ab = sub(pts[i + 1], a), L2 = dot(ab, ab), u = Math.max(0, Math.min(1, dot(sub(p, a), ab) / L2)), q = add(a, mul(ab, u)), d = sub(p, q), dd = dot(d, d); if (dd < best) { best = dd; bp = q; } }
+  return { d: Math.sqrt(best), q: bp };
+}
+
+/* ---------------- anatomy */
+function costal(az) { return az > 0 ? XIPH - 1.15 * (90 - az) : -190; }
+function diaphragm(x, z) { var y = -54 - 0.119 * x - 0.38 * z - (x > 40 ? 0.6 * (x - 40) : 0); return y < -150 ? -150 : y; }
+function heartSample(x, y, z) {           // -> tissue id, or -(distance outside the heart in mm) - 1 when outside, or null outside the grid
+  var dx = x - TT[0], dy = y - TT[1], dz = z - TT[2];
+  var lx = RM[0][0] * dx + RM[1][0] * dy + RM[2][0] * dz, ly = RM[0][1] * dx + RM[1][1] * dy + RM[2][1] * dz, lz = RM[0][2] * dx + RM[1][2] * dy + RM[2][2] * dz;
+  var a0 = (lx - LO[0]) / HV, a1 = (ly - LO[1]) / HV, a2 = (lz - LO[2]) / HV;
+  if (!(a0 >= 0 && a1 >= 0 && a2 >= 0 && a0 < NX - 1 && a1 < NY - 1 && a2 < NZ - 1)) return null;
+  var lb = LAB[((a0 + 0.5) | 0) * SI + ((a1 + 0.5) | 0) * SJ + ((a2 + 0.5) | 0)];
+  if (tri(TIS, a0, a1, a2) > 128) return lb === 6 ? T.VALVE : T.MYO;
+  if (lb >= 1 && lb <= 5) return BLOOD[lb];
+  return -(tri(HD, a0, a1, a2) * 0.25) - 1;
+}
+function tissueAt(x, y, z, t, S) {
+  if (y <= YB || y >= YT) return 0;
+  var r2 = x * x * IA2 + z * z * IB2; if (r2 >= 1) return 0;
+  var rho = Math.sqrt(r2), d = rho < 0.3 ? 99 : (1 - rho) * rho / Math.sqrt(x * x * IA4 + z * z * IB4), ax = x < 0 ? -x : x, a, b, s;
+  if (d < WALL) {                                                                        // chest and abdominal wall
+    if (d < 2) return T.SKIN;
+    if (d < 6.5) return T.FAT;
+    if (z > 0 && ax < STERN && y > XIPH) return (d > 7 && d < 16) ? T.BONE : T.MUSC;      // sternum
+    var az = Math.atan2(z / RB, ax / RA) * R2D;
+    if (d > 8.4 && d < 14.6 && y > costal(az) + 4) {
+      s = y + 0.45 * az + RIB_PH; s -= RIB_P * Math.floor(s / RIB_P);
+      if (s < RIB_W) { a = (s - 3.5) / 3.7; b = (d - 11.5) / 3.1; if (a * a + b * b < 1) return az > CCJ ? T.CART : T.BONE; }
+    }
+    return T.MUSC;
+  }
+  var hd = 60, h = heartSample(x, y, z);
+  if (h !== null) { if (h >= 0) return h; hd = -h - 1; if (hd < 1.0) return T.PERI; if (hd < 3.5) return T.MED; }
+  var p = [x, y, z];
+  if (y < 30 && y > -200 && nearLine(p, LINES.IVC).d < 10) return T.VES;                  // inferior vena cava (procedural) through the liver into the RA
+  if (nearLine(p, LINES.DAo).d < 11) return T.VES;                                        // descending aorta behind the left atrium (procedural)
+  a = z + SPZ; if (x * x + a * a < SPR2) { s = y - 30 * Math.floor(y / 30); return s < 6 ? T.DISC : T.BONE; }
+  if (y < diaphragm(x, z)) return x < 55 ? T.LIVER : T.GAS;
+  if (hd < 7) return T.MED;
+  if (z > 30 && x > -24 && x < 108 && y < 44) return T.MED;                              // bare area: no lung between the heart and the anterior chest wall
+  return T.LUNG;
+}
+
+/* ---------------- body */
+var skin = P.geo.cylinder({ p0: [0, YB, 0], p1: [0, YT, 0], ra: RA, rb: RB, e1: [1, 0, 0] });
+function wallPt(sd, az, y, depth) { var c = Math.cos(az * D2R), s = Math.sin(az * D2R); return [sd * (RA - depth) * c, y, (RB - depth) * s]; }
+
+/* ---------------- 3D: ribs, ray-marched real heart with chamber-coloured section, window markers and the target (ghost) probe */
+var h3 = null, ghost = null, winDots = [], TH3 = null;
+var CHCOL = 'vec3 chamber(float l){ if(l<0.5) return vec3(0.0); if(l<1.5) return vec3(0.36,0.55,0.95); if(l<2.5) return vec3(0.98,0.62,0.28); if(l<3.5) return vec3(0.24,0.34,0.86); if(l<4.5) return vec3(0.93,0.30,0.32); if(l<5.5) return vec3(0.35,0.80,0.45); return vec3(1.0,0.95,0.6); }';
+function scene(c) {
+  var TH = c.THREE, m = c.mat, o = {}, k, az, pts; TH3 = TH;
+  o.skin = c.add(skin.mesh(TH, m(0xE2BFA6, { opacity: 0.2, double: true }))); o.skin.renderOrder = 4;
+  var bodyM = m(0xE2BFA6, { opacity: 0.45, noClip: true });
+  c.ellipsoid([0, YT + 96, -10], [72, 96, 88], null, bodyM); c.ellipsoid([0, YT + 8, -14], [56, 30, 50], null, bodyM);
+  var bone = m(0xE6E0CF, { opacity: 0.55 });
+  o.ribs = [c.tube([[0, XIPH + 4, RB - 11.5], [0, 40, RB - 11.5], [0, YT - 30, RB - 11.5]], 8, bone)];
+  var cart = m(0xBFD3D0, { opacity: 0.45 });
+  for (k = -8; k <= 8; k++) [-1, 1].forEach(function (sd) {
+    var ribY = function (a) { return RIB_P * k + 3.5 - RIB_PH - 0.45 * a; };
+    pts = []; for (az = -72; az <= CCJ; az += 6) { if (ribY(az) < costal(az) + 6 || ribY(az) > YT - 22) continue; pts.push(wallPt(sd, az, ribY(az), 11.5)); }
+    if (pts.length > 2) o.ribs.push(c.tube(pts, 3.6, bone));
+    pts = []; for (az = CCJ; az <= 82; az += 5.5) { if (ribY(az) < costal(az) + 6 || ribY(az) > YT - 22) continue; pts.push(wallPt(sd, az, ribY(az), 11.5)); }
+    if (pts.length > 2) o.ribs.push(c.tube(pts, 3.2, cart));
+  });
+  [LINES.DAo, LINES.IVC].forEach(function (L) { c.tube(L, L === LINES.IVC ? 10 : 11, m(0x9AA6C8, { opacity: 0.5 })); });
+  /* real heart: two 3D textures in the heart's own frame (tissue density, chamber labels) */
+  var mk = function (arr, lin) { var tx = new TH.Data3DTexture(arr, NZ, NY, NX); tx.format = TH.RedFormat; tx.type = TH.UnsignedByteType; tx.minFilter = tx.magFilter = lin ? TH.LinearFilter : TH.NearestFilter; tx.unpackAlignment = 1; tx.needsUpdate = true; return tx; };
+  var SZv = [NX * HV, NY * HV, NZ * HV];
+  var U = {
+    uVol: { value: mk(TIS, true) }, uLab: { value: mk(LAB, false) }, uIso: { value: 0.5 }, uCam: { value: new TH.Vector3() }, uMVP: { value: new TH.Matrix4() },
+    uO: { value: new TH.Vector3() }, uN: { value: new TH.Vector3(0, 0, 1) }, uU: { value: new TH.Vector3(1, 0, 0) }, uB: { value: new TH.Vector3(0, 1, 0) },
+    uCut: { value: 0 }, uCutSign: { value: 1 }, uShow: { value: 1 }, uDepth: { value: 160 }, uHalf: { value: 0.7 }, uCham: { value: 1 },
+    uLo: { value: new TH.Vector3(LO[0], LO[1], LO[2]) }, uSz: { value: new TH.Vector3(SZv[0], SZv[1], SZv[2]) }
+  };
+  var mat = new TH.ShaderMaterial({
+    uniforms: U, side: TH.BackSide,
+    vertexShader: 'varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: [
+      'precision highp float; precision highp sampler3D;',
+      'varying vec3 vPos; uniform sampler3D uVol, uLab; uniform mat4 uMVP; uniform vec3 uCam, uO, uN, uU, uB, uLo, uSz;',
+      'uniform float uIso, uCut, uCutSign, uShow, uDepth, uHalf, uCham;', CHCOL,
+      'vec3 tc(vec3 p){ vec3 q = (p - uLo) / uSz; return vec3(q.z, q.y, q.x); }',
+      'float S(vec3 p){ return texture(uVol, tc(p)).r; }',
+      'float Lb(vec3 p){ return texture(uLab, tc(p)).r * 255.0; }',
+      'bool clipd(vec3 p){ return uCut > 0.5 && dot(p - uO, uN) * uCutSign > 0.0; }',
+      'bool inSec(vec3 p){ vec3 d = p - uO; float x = dot(d, uU), y = dot(d, uB); return y > 0.0 && length(vec2(x, y)) < uDepth && abs(atan(x, y)) < uHalf; }',
+      'void main(){',
+      '  vec3 bmin = uLo, bmax = uLo + uSz, ro = uCam, rd = normalize(vPos - ro), inv = 1.0 / rd, t0 = (bmin - ro) * inv, t1 = (bmax - ro) * inv, tn = min(t0, t1), tf = max(t0, t1);',
+      '  float a = max(max(max(tn.x, tn.y), tn.z), 0.0), b = min(min(tf.x, tf.y), tf.z); if (a >= b) discard;',
+      '  float dt = 0.45, t = a; bool prevC = false, hit = false, cutFace = false, chamberFace = false; vec3 p; float lab = 0.0;',
+      '  for (int i = 0; i < 700; i++) { if (t > b) break; p = ro + rd * t; bool c = clipd(p);',
+      '    if (!c && prevC && uCham > 0.5) { lab = Lb(p); if (lab > 0.5 && lab < 5.5 && S(p) < uIso) { hit = true; chamberFace = true; break; } }',
+      '    if (!c && S(p) > uIso) { hit = true; cutFace = prevC; break; } prevC = c; t += dt; }',
+      '  if (!hit) discard;',
+      '  vec3 col, n;',
+      '  if (chamberFace) { n = uN * uCutSign; col = chamber(lab) * 0.85; if (uShow > 0.5 && inSec(p)) col = mix(col, vec3(0.47, 0.82, 0.77), 0.25); }',
+      '  else if (cutFace) { n = uN * uCutSign; float v = S(p); col = mix(vec3(0.62, 0.36, 0.32), vec3(0.93, 0.78, 0.72), smoothstep(0.5, 0.95, v)); if (Lb(p) > 5.5) col = vec3(1.0, 0.93, 0.62); if (uShow > 0.5 && inSec(p)) col = mix(col, vec3(0.47, 0.82, 0.77), 0.35); }',
+      '  else { float lo = t - dt, hi = t; for (int k = 0; k < 5; k++) { float mm = 0.5 * (lo + hi); if (S(ro + rd * mm) > uIso) hi = mm; else lo = mm; } p = ro + rd * hi;',
+      '    float e = 0.9; vec3 g = vec3(S(p + vec3(e, 0, 0)) - S(p - vec3(e, 0, 0)), S(p + vec3(0, e, 0)) - S(p - vec3(0, e, 0)), S(p + vec3(0, 0, e)) - S(p - vec3(0, 0, e)));',
+      '    n = length(g) > 1e-5 ? -normalize(g) : -rd; col = vec3(0.72, 0.36, 0.30); if (uShow > 0.5 && abs(dot(p - uO, uN)) < 1.2 && inSec(p)) col = vec3(0.47, 0.82, 0.77); }',
+      '  if (dot(n, rd) > 0.0) n = -n;',
+      '  vec3 L1 = normalize(vec3(0.3, 0.45, 0.85));',
+      '  float dif = 0.34 + 0.46 * max(dot(n, -rd), 0.0) + 0.30 * max(dot(n, L1), 0.0), spc = pow(max(dot(reflect(rd, n), L1), 0.0), 24.0) * 0.2;',
+      '  gl_FragColor = vec4(col * dif + spc, 1.0);',
+      '  vec4 cp = uMVP * vec4(p, 1.0); gl_FragDepth = (cp.z / cp.w) * 0.5 + 0.5;',
+      '}'].join('\n')
+  });
+  var geo = new TH.BoxGeometry(SZv[0], SZv[1], SZv[2]); geo.translate(LO[0] + SZv[0] / 2, LO[1] + SZv[1] / 2, LO[2] + SZv[2] / 2);
+  var mesh = new TH.Mesh(geo, mat); mesh.frustumCulled = false; mesh.matrixAutoUpdate = false;
+  mesh.matrix.makeBasis(new TH.Vector3(RM[0][0], RM[1][0], RM[2][0]), new TH.Vector3(RM[0][1], RM[1][1], RM[2][1]), new TH.Vector3(RM[0][2], RM[1][2], RM[2][2])); mesh.matrix.setPosition(TT[0], TT[1], TT[2]); mesh.matrixWorldNeedsUpdate = true;
+  var inv = new TH.Matrix4(), cl = new TH.Vector3();
+  mesh.onBeforeRender = function (rdr, scn, cam) {
+    inv.copy(mesh.matrixWorld).invert(); cl.copy(cam.position).applyMatrix4(inv); U.uCam.value.copy(cl);
+    U.uMVP.value.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).multiply(mesh.matrixWorld);
+    U.uCutSign.value = cl.sub(U.uO.value).dot(U.uN.value) > 0 ? 1 : -1;
+  };
+  c.add(mesh);
+  h3 = { U: U };
+  /* window markers on the skin (one per acoustic window) */
+  var WCOL = { para: 0xE58A98, apex: 0x78D2C4, subx: 0xE0A458 };
+  [['para', POSE.plax.O], ['apex', POSE.a4c.O], ['subx', POSE.subx.O]].forEach(function (w) { var s = c.ellipsoid(w[1], [7, 7, 7], null, m(WCOL[w[0]], { opacity: 0.85, noClip: true })); winDots.push(s); });
+  /* ghost probe: where the selected view is acquired */
+  var gm = m(0xE0A458, { opacity: 0.45, noClip: true });
+  ghost = new TH.Group(); var body = new TH.Mesh(new TH.BoxGeometry(22, 9, 34), gm); body.position.set(0, 0, -17); ghost.add(body);
+  var nub = new TH.Mesh(new TH.BoxGeometry(4, 10, 6), m(0xE0A458, { opacity: 0.9, noClip: true })); nub.position.set(12, 0, -8); ghost.add(nub);   // index marker on the +u side
+  ghost.matrixAutoUpdate = false; ghost.visible = false; c.add(ghost);
+  return { skin: o.skin, anatomy: function (on) { o.ribs.forEach(function (mm) { mm.visible = !on; }); } };
+}
+function placeGhost(TH, P0) {
+  if (!ghost || !P0) return; var n = P0.n, u = P0.u, N = nrm(cross(n, u));
+  ghost.matrix.makeBasis(new TH.Vector3(u[0], u[1], u[2]), new TH.Vector3(N[0], N[1], N[2]), new TH.Vector3(-n[0], -n[1], -n[2]));
+  ghost.matrix.setPosition(P0.O[0] - n[0] * 2, P0.O[1] - n[1] * 2, P0.O[2] - n[2] * 2); ghost.matrixWorldNeedsUpdate = true;
+}
+
+/* ---------------- 3D anatomy models (context only) */
+var ANATOMY = {
+  opacity: 0.65,
+  models: [
+    { id: 'thorax', url: 'm3d/human_thorax.glb', credit: { title: 'Human thorax (ribcage)', author: 'Medulla (Sketchfab)', licence: 'CC BY 4.0', licenceUrl: 'https://creativecommons.org/licenses/by/4.0/', source: 'https://sketchfab.com/3d-models/human-thorax-4aba9b2ced344bdf8f09656c6a298b50', changes: 'Decompressed, simplified and quantized; scaled and positioned to this simulated chest.' }, fit: { width: 297, top: 169, cx: 0, cz: 0 } },
+    { id: 'lung', url: 'm3d/lung.glb', credit: { title: 'Lung segmentation', author: 'Nahiarapa (Sketchfab)', licence: 'CC BY 4.0', licenceUrl: 'https://creativecommons.org/licenses/by/4.0/', source: 'https://sketchfab.com/3d-models/lung-model-4a6ac26d9f6d4094ba8f38bf67f42209', changes: 'Decompressed, simplified and quantized; recoloured; scaled and positioned inside this simulated chest.' }, style: function () { return { color: 0xD8A0A8, opacity: 0.32 }; }, fit: { width: 262, bottom: -112, cx: 0, cz: -4 } }
+  ]
+};
+
+/* ---------------- per-render hook: 3D section follows the probe; ghost and assistant follow the selected view */
+var ASST = { on: true, cham: true }, lastA = 0;
+function frame(S, t, api) {
+  var ps = api.pose, st = api.st;
+  if (h3 && ps) { var U = h3.U, O = toLocal(ps.O), N = dirLocal(ps.N), u = dirLocal(ps.u), n = dirLocal(ps.n); U.uO.value.set(O[0], O[1], O[2]); U.uN.value.set(N[0], N[1], N[2]); U.uU.value.set(u[0], u[1], u[2]); U.uB.value.set(n[0], n[1], n[2]);
+    U.uCut.value = st.cut ? 1 : 0; U.uShow.value = st.fan ? 1 : 0; U.uDepth.value = st.depth * 10; U.uHalf.value = 40 * D2R * st.sector / 100; U.uCham.value = ASST.cham ? 1 : 0; }
+  if (ghost && TH3 && api.target) { ghost.visible = ASST.on; placeGhost(TH3, api.target); }
+  var now = performance.now(); if (now - lastA > 120) { lastA = now; assistant(api); }
+}
+
+/* ---------------- probe position assistant */
+function wrap180(a) { a = ((a + 180) % 360 + 360) % 360 - 180; return a; }
+function arcFromMidline(p) { var f = Math.atan2(p[2] / RB, p[0] / RA), f0 = Math.PI / 2, n = 24, s = 0, prev = null; for (var i = 0; i <= n; i++) { var g = f0 + (f - f0) * i / n, q = [RA * Math.cos(g), 0, RB * Math.sin(g)]; if (prev) s += Math.hypot(q[0] - prev[0], q[2] - prev[2]); prev = q; } return s; }
+function region(O, arc) {
+  var side = O[0] >= 0 ? 'left' : 'right';
+  if (O[1] < XIPH + 5 && arc < 70) return 'subxiphoid / epigastric';
+  if (arc < 17) return 'over the sternum';
+  if (arc < 45) return side + ' parasternal';
+  if (arc < 105) return side + ' anterior chest';
+  if (arc < 165) return side + ' lateral chest (apical / axillary)';
+  return side + ' posterior chest';
+}
+function footprint(api) {                         // what lies under the probe face: rib, cartilage or an interspace
+  var ps = api.pose; if (!ps) return null; var cnt = { bone: 0, cart: 0, ok: 0 };
+  for (var i = -5; i <= 5; i++) { var hitB = 0, hitC = 0; for (var dd = 6; dd <= 18; dd += 2) { var q = add(add(ps.O, mul(ps.u, i * 2)), mul(ps.n, dd)), id = tissueAt(q[0], q[1], q[2], 0, null); if (id === T.BONE) hitB = 1; else if (id === T.CART) hitC = 1; } if (hitB) cnt.bone++; else if (hitC) cnt.cart++; else cnt.ok++; }
+  return cnt;
+}
+function assistant(api) {
+  var box = document.getElementById('as-live'); if (!box || !api.pose) return;
+  var st = api.st, ps = api.pose, tg = api.target, O = ps.O, arc = arcFromMidline(O), fp = footprint(api);
+  var where = '<b class="n">' + (arc / 10).toFixed(1) + ' cm</b> ' + (O[0] >= 0 ? 'left' : 'right') + ' of the midline (along the skin), <b class="n">' + Math.abs((O[1] - XIPH) / 10).toFixed(1) + ' cm</b> ' + (O[1] >= XIPH ? 'above' : 'below') + ' the xiphoid · ' + region(O, arc) + '.';
+  var fpt = fp ? (fp.bone > 3 ? '<span style="color:var(--crimson);font-weight:600">Face over a rib: ' + Math.round(fp.bone / 11 * 100) + '% shadowed. Slide or rotate into the interspace.</span>' : fp.bone > 0 ? 'Edge of the face on a rib (' + Math.round(fp.bone / 11 * 100) + '%).' : fp.cart > 2 ? 'Face on costal cartilage: sound passes, as beside the sternum.' : '<span class="ok">Face in an interspace or soft tissue.</span>') : '';
+  document.getElementById('as-where').innerHTML = where + '<br>' + fpt + '<br>Index marker toward <b>' + markerWords(ps.u) + '</b>; beam aimed toward <b>' + dirWords(ps.n) + '</b>.';
+  if (!tg) return;
+  var d = sub(tg.O, O), dist = Math.hypot(d[0], d[1], d[2]), dy = d[1], tang = Math.hypot(d[0], d[2]) * (d[0] >= 0 ? 1 : -1);
+  var dr = wrap180(tg.rot - st.rot), dti = wrap180(tg.tilt - st.tilt), drk = wrap180(tg.rock - st.rock);
+  var row = function (lab, val, unit, tol, hint) { var ok = Math.abs(val) <= tol, w = Math.max(0, 1 - Math.abs(val) / (tol * 6)); return '<tr><td>' + lab + '</td><td class="n">' + (val > 0 ? '+' : '') + val.toFixed(0) + unit + '</td><td style="width:34%"><div class="bar"><i style="width:' + Math.round(w * 100) + '%"></i></div></td><td>' + (ok ? '<span class="ok">on target</span>' : hint) + '</td></tr>'; };
+  var vw = (api.cfg.views.filter(function (v) { return v.id === st.view; })[0] || {}).short || st.view;
+  var html = '<table><tbody>' +
+    row('Slide (head/feet)', dy, ' mm', 8, dy > 0 ? 'slide toward the head' : 'slide toward the feet') +
+    row('Slide (around chest)', tang, ' mm', 8, tang > 0 ? 'slide toward the patient’s left' : 'slide toward the patient’s right') +
+    row('Rotate', dr, '°', 8, dr > 0 ? 'rotate one way (+)' : 'rotate the other way (−)') +
+    row('Tilt / fan', dti, '°', 6, dti > 0 ? 'fan (+)' : 'fan (−)') +
+    row('Rock (heel–toe)', drk, '°', 6, drk > 0 ? 'rock (+)' : 'rock (−)') + '</tbody></table>';
+  var all = dist <= 10 && Math.abs(dr) <= 8 && Math.abs(dti) <= 6 && Math.abs(drk) <= 6;
+  box.innerHTML = '<p style="margin:0 0 6px"><b>Target: ' + vw + '</b> · ' + (all ? '<span class="ok">probe on the reference pose</span>' : 'distance ' + dist.toFixed(0) + ' mm') + '</p>' + html;
+}
+function axisWord(v) { var a = [[Math.abs(v[1]), v[1] > 0 ? 'the head' : 'the feet'], [Math.abs(v[0]), v[0] > 0 ? 'the patient’s left' : 'the patient’s right'], [Math.abs(v[2]), v[2] > 0 ? 'the front' : 'the back']].sort(function (p, q) { return q[0] - p[0]; }); return a; }
+function markerWords(u) { var a = axisWord(u); return a[1][0] > 0.45 ? a[0][1] + ' and ' + a[1][1] : a[0][1]; }
+function dirWords(n) { var a = axisWord(n); return a[1][0] > 0.45 ? a[0][1] + ' and ' + a[1][1] : a[0][1]; }
+
+/* ---------------- labels */
+function nearOnLine(pts, always) {
+  return function () {
+    var ps = sim && sim.pose; if (!ps) return always ? pts[0] : null; var best = null, bd = 1e9, any = pts[0], ad = 1e9;
+    for (var i = 0; i < pts.length - 1; i++) for (var k = 0; k <= 10; k++) { var p = add(pts[i], mul(sub(pts[i + 1], pts[i]), k / 10)), q = sim.world2img(p), e = Math.abs(q.e); if (q.ok && e < bd) { bd = e; best = p; } if (e < ad) { ad = e; any = p; } }
+    return best || (always ? any : null);
+  };
+}
+var LABELS = [
+  { t: 'LV', p: LM.LV, tol: 13 }, { t: 'RV', p: LM.RV, tol: 12 }, { t: 'LA', p: LM.LA, tol: 12 }, { t: 'RA', p: LM.RA, tol: 12 },
+  { t: 'MV', p: LM.MV, tol: 8 }, { t: 'TV', p: LM.TV, tol: 8 }, { t: 'AoV', p: LM.AV, tol: 8 }, { t: 'PV', p: LM.PV, tol: 8 },
+  { t: 'Ao', p: LM.AO, tol: 10 }, { t: 'PA', p: LM.PA, tol: 10 },
+  { t: 'DAo', p: nearOnLine(LINES.DAo), tol: 8 }, { t: 'IVC', p: nearOnLine(LINES.IVC), tol: 7 }
+];
+
+/* ---------------- views (all standard TTE windows; poses computed on this heart) */
+function mid(a, b) { return mul(add(a, b), 0.5); }
+function lvTilt(pose) { return Math.atan2(dot(LVAX, pose.n), -dot(LVAX, pose.u)) * R2D; }
+var FOUR = [{ ids: [T.LVB], min: 0.03, label: 'Left ventricle' }, { ids: [T.RVB], min: 0.02, label: 'Right ventricle' }, { ids: [T.LAB], min: 0.01, label: 'Left atrium' }, { ids: [T.RAB], min: 0.01, label: 'Right atrium' }];
+var VIEWS = [
+  { id: 'plax', group: 'Parasternal', name: 'Parasternal long axis (PLAX)', short: 'PLAX', probe: 'ph', depth: 16, pose: POSE.plax, tol: { slide: 12 },
+    require: [{ ids: [T.LVB], min: 0.04, label: 'Left ventricle' }, { ids: [T.LAB], min: 0.015, label: 'Left atrium' }, { pt: LM.AV, within: 9, label: 'Aortic valve in the plane', hint: 'Rotate until the aortic and mitral valves are both in the plane.' }],
+    how: 'Left sternal border, just lateral to the sternum. Index marker toward the patient’s right shoulder.',
+    see: ['RV outflow at the top, then septum, LV and posterior wall; mitral and aortic valves together; LA behind the aortic root.', 'This real heart is slightly tilted in PLAX: rock and slide until the LV lies across the screen.'] },
+  { id: 'rvit', group: 'Parasternal', name: 'Right ventricular inflow', short: 'RV inflow', probe: 'ph', depth: 16, pose: POSE.rvit, find: false,
+    how: 'From PLAX, fan the beam toward the patient’s right hip.', see: ['Right atrium, tricuspid valve and right ventricle; the LV leaves the image.'] },
+  { id: 'psax-av', group: 'Parasternal', name: 'Short axis, aortic valve level', short: 'PSAX AV', probe: 'ph', depth: 15, pose: POSE['psax-av'], find: false,
+    how: 'From PLAX rotate about 90° clockwise (marker to the left shoulder) and fan toward the base.', see: ['Aortic valve in cross-section with the RV outflow curving over it; LA behind, RA to its left.'] },
+  { id: 'psax-mv', group: 'Parasternal', name: 'Short axis, mitral valve level', short: 'PSAX MV', probe: 'ph', depth: 15, pose: POSE['psax-mv'], find: false,
+    how: 'Fan from the aortic level toward the apex until the mitral leaflets sit in the LV.', see: ['Mitral leaflets in a round LV; RV anterior and to the left of the screen.'] },
+  { id: 'psax-pm', group: 'Parasternal', name: 'Short axis, mid-papillary (PSAX)', short: 'PSAX', probe: 'ph', depth: 15, pose: POSE['psax-pm'], tol: { slide: 12 },
+    require: [{ ids: [T.LVB], min: 0.03, label: 'Left ventricle' }, { ids: [T.RVB], min: 0.01, label: 'Right ventricle' }, { pt: mid(LM.MV, LM.APEX), within: 10, label: 'Cut at the papillary level', hint: 'Fan toward the apex or the base until the plane crosses the middle of the ventricle.' }],
+    how: 'Fan further toward the apex; keep the marker to the left shoulder. Adjust rotation until the LV is round.', see: ['A round LV with both papillary muscles; the RV as a crescent on the septum.'] },
+  { id: 'psax-ap', group: 'Parasternal', name: 'Short axis, apical level', short: 'PSAX apex', probe: 'ph', depth: 15, pose: POSE['psax-ap'], find: false,
+    how: 'Fan past the papillary muscles toward the apex.', see: ['A small round apical LV cavity.'] },
+  { id: 'a4c', group: 'Apical', name: 'Apical four-chamber (A4C)', short: 'A4C', probe: 'ph', depth: 18, pose: POSE.a4c, tol: { slide: 14 },
+    require: FOUR.concat([{ pt: LM.APEX, within: 12, label: 'True apex in the plane', hint: 'The ventricle looks short: slide lower and more lateral.' }]),
+    how: 'Probe at the apex, beam toward the right shoulder, index marker to the patient’s left.', see: ['Four chambers, both AV valves and the crux; LV on the screen right with the marker on the right.'] },
+  { id: 'a5c', group: 'Apical', name: 'Apical five-chamber (A5C)', short: 'A5C', probe: 'ph', depth: 18, pose: POSE.a5c, tol: { slide: 14 },
+    require: [{ ids: [T.LVB], min: 0.03, label: 'Left ventricle' }, { pt: LM.AV, within: 10, label: 'Outflow tract and aortic valve', hint: 'Tilt anteriorly from the four-chamber view until the aortic valve opens up.' }],
+    how: 'From A4C tilt the beam anteriorly until the LV outflow and aortic valve appear.', see: ['LV outflow tract and aortic valve in the middle of the four chambers.'] },
+  { id: 'a2c', group: 'Apical', name: 'Apical two-chamber', short: 'A2C', probe: 'ph', depth: 18, pose: POSE.a2c, find: false,
+    how: 'From A4C rotate about 60–75° counter-clockwise until the right heart leaves the image.', see: ['LV and LA only; anterior wall on the screen right.'] },
+  { id: 'a3c', group: 'Apical', name: 'Apical long axis (A3C)', short: 'A3C', probe: 'ph', depth: 18, pose: POSE.a3c, find: false,
+    how: 'Keep rotating counter-clockwise from A2C until the aortic valve appears.', see: ['LV, LA and LV outflow with the aortic valve: the PLAX structures seen from the apex.'] },
+  { id: 'subx', group: 'Subxiphoid', name: 'Subxiphoid four-chamber', short: 'Subxiphoid', probe: 'ph', depth: 19, pose: POSE.subx, tol: { slide: 14 },
+    require: FOUR.concat([{ ids: [T.LIVER], min: 0.03, label: 'Liver as the window', hint: 'Keep the probe flat under the xiphoid so the beam passes through the liver.' }]),
+    how: 'Probe flat under the xiphoid, aimed at the left shoulder, index marker to the patient’s left.', see: ['Four chambers through the liver; RV free wall nearest the probe.'] },
+  { id: 'ivc', group: 'Subxiphoid', name: 'Subxiphoid IVC, long axis', short: 'IVC', probe: 'ph', depth: 16, pose: POSE.ivc, find: false,
+    how: 'From the subxiphoid view rotate so the index marker points to the head.', see: ['IVC through the liver entering the right atrium (the IVC here is a modelled tube).'] }
+];
+var VARIANTS = [{ id: 'normal', name: 'Normal real heart', answer: 'Normal anatomy', group: 'Standard', views: VIEWS.map(function (v) { return v.id; }) }];
+
+/* ---------------- boot */
+var sim = null, onBench = /sim-heart-real\.html$/.test(location.pathname) && !/claude/.test(location.hostname);
+function start() {
+  document.getElementById('app').textContent = '';
+  sim = P.create({
+    mount: '#app', name: 'heart-real', session: 's4', tab: 3, title: 'Real Heart Probe Lab',
+    backHref: 'https://claude.ai/artifact/XquZo87h2RA2YmMJUz5ndR',
+    tissues: TISSUES, tissueAt: tissueAt, frame: frame, skin: skin, scene: scene, defaults: function () { return {}; },
+    posture: 'supine', markerSide: 'right', camDist: 780, penCoupling: true, anatomy: ANATOMY,
+    probes: { ph: { type: 'sector', label: 'Phased array 1–5 MHz', fov: 80, depth: [8, 24], defDepth: 16 } },
+    views: VIEWS, variants: VARIANTS, labels: LABELS, casesToComplete: 0,
+    slideLabels: ['Slide along the body (head / feet)', 'Slide around the chest'],
+    notes: '<h3>What is different here</h3><ul><li>The heart is a real human heart (static), not a modelled one: trabeculations, papillary muscles, moderator band and valve leaflets come from the specimen.</li><li>Every standard TTE window is available, each with a reference pose computed from this heart’s own valves and apex.</li><li>Use the position assistant below the instrument: it shows where the probe is on the chest, whether the face sits on a rib, and how far it is from the reference pose.</li></ul>',
+    footer: 'Heart: University of Minnesota Visible Heart Laboratories specimen, reassembled from the TEE teaching set; © Regents of the University of Minnesota, used here for evaluation only. Torso, ribs, lungs and liver are the procedural chest of the Cardiac POCUS Trainer.'
+  });
+  window.sim = sim;
+  var card = document.createElement('section'); card.className = 'pb-card'; card.id = 'hr-asst';
+  card.innerHTML = '<h3 style="margin-top:0">Probe position assistant</h3><div class="as-grid"><div><p class="as-where" id="as-where"></p>' +
+    '<div class="legend"><span><i style="background:#E58A98"></i>parasternal window</span><span><i style="background:#78D2C4"></i>apical window</span><span><i style="background:#E0A458"></i>subxiphoid window · ghost probe = reference pose</span></div>' +
+    '<label class="chk"><input type="checkbox" id="as-ghost" checked> Show the reference (ghost) probe in 3D</label>' +
+    '<label class="chk"><input type="checkbox" id="as-cham" checked> Colour the chambers on the 3D section (turn on “Cut”)</label>' +
+    '<div class="legend"><span><i style="background:#ef4d52"></i>LV</span><span><i style="background:#fa9e47"></i>LA</span><span><i style="background:#3d57db"></i>RV</span><span><i style="background:#5c8cf2"></i>RA</span><span><i style="background:#59cc73"></i>Ao / PA</span><span><i style="background:#fff29e"></i>valve</span></div></div>' +
+    '<div id="as-live"></div></div><p class="pb-muted" style="margin:10px 0 0">The reference pose is one good acquisition on this heart, not the only one. Signs of rotate, fan and rock follow the sliders in the probe panel. The chest is a modelled torso: distances are for orientation, not for teaching surface anatomy.</p>';
+  var notes = document.querySelector('#app .pb-notes'); if (notes) notes.parentNode.insertBefore(card, notes); else document.getElementById('app').appendChild(card);
+  card.querySelector('#as-ghost').addEventListener('change', function (e) { ASST.on = e.target.checked; sim.redraw(); sim.redraw3d && sim.redraw3d(); });
+  card.querySelector('#as-cham').addEventListener('change', function (e) { ASST.cham = e.target.checked; sim.redraw(); sim.redraw3d && sim.redraw3d(); });
+}
+load().then(start).catch(function (e) { if (window.console) console.error('heart-real:', e); var m = document.getElementById('hr-msg'); if (m) m.textContent = 'The heart model did not load (' + e.message + ').'; });
+})();
+</script>
+</body>
+</html>
