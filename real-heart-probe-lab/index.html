@@ -37,6 +37,7 @@ html[data-theme="dark"]{background:#1B1013;color:#F3E7E8}html[data-theme="dark"]
 <body>
 <div id="app"><div id="hr-load"><b>Real Heart Probe Lab</b><span id="hr-msg">Loading the heart model…</span><div id="hr-bar"><i id="hr-fill"></i></div></div></div>
 <noscript><p style="padding:16px">This simulator needs JavaScript. Educational simulation with modelled anatomy. Not a diagnostic device.</p></noscript>
+<script src="bench-controls.js"></script>
 <script src="sim-engine.js"></script>
 <script>
 /* sim-heart-real — Bench session s4 companion: every standard TTE window on a REAL human heart. Built on PBSim (sim-engine.js).
@@ -47,7 +48,7 @@ html[data-theme="dark"]{background:#1B1013;color:#F3E7E8}html[data-theme="dark"]
    trunk from their own lumens), thin tissue within 14-18 mm of each valve centre labelled as valve, then resampled to 0.7 mm.
    The heart is placed rigidly (no scaling) onto the landmark positions of the Bench's TTESim heart (MV, TV, AV, PV, apex, chamber centres;
    residual 4-14 mm) so the chest wall, ribs, lungs, liver and spine below are the same procedural torso as sim-cardiac.
-   It is static: one fixed (diastolic) shape, no motion. Licence: (c) Regents of the University of Minnesota; permission needed before release.
+   It is static: one fixed (diastolic) shape, no motion. Licence: (c) Regents of the University of Minnesota; used with permission (confirmed by Dr. Kabeil, 24 Oct 2026).
    Data file sim-heart-real.txt = base64(gzip(TIS | LAB | HD)), uint8 each, C-order [x][y][z] in the heart's own frame:
    TIS smoothed tissue density (0-255, tissue > 128), LAB 1 RA 2 LA 3 RV 4 LV 5 great vessel 6 valve, HD distance outside the heart (0.25 mm units). */
 (function () {
@@ -386,7 +387,7 @@ function start() {
     views: VIEWS, variants: VARIANTS, labels: LABELS, casesToComplete: 0,
     slideLabels: ['Slide along the body (head / feet)', 'Slide around the chest'],
     notes: '<h3>What is different here</h3><ul><li>The heart is a real human heart (static), not a modelled one: trabeculations, papillary muscles, moderator band and valve leaflets come from the specimen.</li><li>Every standard TTE window is available, each with a reference pose computed from this heart’s own valves and apex.</li><li>Use the position assistant below the instrument: it shows where the probe is on the chest, whether the face sits on a rib, and how far it is from the reference pose.</li></ul>',
-    footer: 'Heart: University of Minnesota Visible Heart Laboratories specimen, reassembled from the TEE teaching set; © Regents of the University of Minnesota, used here for evaluation only. Torso, ribs, lungs and liver are the procedural chest of the Cardiac POCUS Trainer.'
+    footer: 'Heart: University of Minnesota Visible Heart Laboratories specimen, reassembled from the TEE teaching set; © Regents of the University of Minnesota, used with permission. Torso, ribs, lungs and liver are the procedural chest of the Cardiac POCUS Trainer.'
   });
   window.sim = sim;
   var card = document.createElement('section'); card.className = 'pb-card'; card.id = 'hr-asst';
