@@ -28,6 +28,7 @@ html[data-theme="dark"]{background:#1B1013;color:#F3E7E8}html[data-theme="dark"]
 #cp-clips .cl-b{min-height:44px;padding:6px 12px;border-radius:var(--r-leaf);border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
 #cp-clips .cl-b[aria-pressed="true"]{background:var(--teal-fill);border-color:var(--teal-line);color:var(--teal);font-weight:600}
 #cp-clips .cl-sp[aria-pressed="true"]{background:var(--teal);color:var(--on-teal);border-color:var(--teal)}
+#cp-mm .cp-mmo{margin:0;padding:6px 10px;font-size:13.5px;color:var(--scr-ink,#ECE5E4);background:#000;border-top:1px solid var(--grid)}
 #cp-report summary{cursor:pointer;font-family:var(--font-display);font-weight:600;font-size:21px;line-height:1.15;min-height:44px;display:flex;align-items:center}
 #cp-report .rp-intro{margin:4px 0 12px;max-width:74ch}
 #cp-report .rp-f{display:grid;grid-template-columns:minmax(140px,190px) minmax(0,1fr);gap:6px 16px;padding:12px 0;border-top:1px solid var(--line)}
@@ -463,13 +464,72 @@ function realism(o) {
 }
 function postPolar(o) {
   if (REAL.on) realism(o);
-  var g = o.st.gain; if (g <= 1.3) return; var add = (g - 1.3) * 0.085, pol = o.pol, spk = o.spk, n = o.NL * o.NS, ids = o.ids;
-  for (var k = 0; k < n; k++) if (ids[k]) pol[k] += add * spk[k];
+  var g = o.st.gain; if (g > 1.3) { var add = (g - 1.3) * 0.085, pol = o.pol, spk = o.spk, n = o.NL * o.NS, ids = o.ids;
+    for (var k = 0; k < n; k++) if (ids[k]) pol[k] += add * spk[k]; }
+  if (MM.on) mmSample(o);
+}
+
+/* ---------------- M-mode: one scan line, sampled every rendered frame onto a strip that sweeps at a fixed speed.
+   Tap the image to choose the line; tap the strip twice to measure along the beam (depth) and across it (time).
+   The heart model advances in 22 frames per cycle, so the strip steps rather than glides; depth is at simulator scale. */
+var MM = { on: false, line: null, x: 0, t: null, D: 160, NL: 0, cv: null, cx: null, pts: [], out: null, geo: null, SWEEP: 100, H: 200 };
+function mmSample(o) {
+  var NL = o.NL, NS = o.NS, pol = o.pol, cx = MM.cx; if (!cx) return;
+  if (MM.line == null || MM.NL !== NL) MM.line = (NL - 1) / 2; MM.NL = NL; MM.D = o.G.D; MM.G = o.G;
+  if (MM.t == null) { MM.t = o.t; return; }
+  var dx = Math.round((o.t - MM.t) * MM.SWEEP); if (dx <= 0) return; if (dx > 40) dx = 40; MM.t = o.t;
+  var l = Math.max(0, Math.min(NL - 1, Math.round(MM.line))), k0 = l * NS, W = MM.cv.width, H = MM.H, col = cx.createImageData(1, H), d = col.data, y, v;
+  for (y = 0; y < H; y++) { v = pol[k0 + Math.min(NS - 1, Math.floor(y / H * NS))]; v = v <= 0 ? 0 : v >= 1 ? 255 : Math.sqrt(v) * 255; d[y * 4] = v; d[y * 4 + 1] = v; d[y * 4 + 2] = v * 0.97; d[y * 4 + 3] = 255; }
+  for (var i = 0; i < dx; i++) { cx.putImageData(col, MM.x, 0); MM.x = (MM.x + 1) % W; }
+  cx.fillStyle = '#E0A458'; cx.fillRect(MM.x, 0, 1, H);                                   // the sweep's leading edge
+  if (MM.pts.length) { MM.pts = []; mmReadout(); }                                         // a moving strip clears old calipers
+}
+function mmOverlay(bx, o) {
+  var A = o.plane2img(0, 0), B = o.plane2img(1, 1); MM.geo = { x0: A[0], y0: A[1], sx: B[0] - A[0], sy: B[1] - A[1], EW: o.EW, EH: o.EH };
+  var G = MM.G; if (!G || MM.line == null || !MM.NL) return;
+  var c = MM.line / (MM.NL - 1), th = -G.half + 2 * G.half * c, p0, p1;
+  if (G.type === 'linear') { p0 = o.plane2img((c - 0.5) * G.W, 0); p1 = o.plane2img((c - 0.5) * G.W, G.D); }
+  else { p0 = o.plane2img(G.R * Math.sin(th), G.R * Math.cos(th) - G.R); p1 = o.plane2img((G.R + G.D) * Math.sin(th), (G.R + G.D) * Math.cos(th) - G.R); }
+  bx.save(); bx.strokeStyle = 'rgba(224,164,88,.9)'; bx.setLineDash([5, 4]); bx.lineWidth = 1.2; bx.beginPath(); bx.moveTo(p0[0], p0[1]); bx.lineTo(p1[0], p1[1]); bx.stroke(); bx.restore();
+}
+function mmPick(ev) {                                                                       // tap on the image: nearest scan line
+  var cv = ev.currentTarget, r = cv.getBoundingClientRect(), g = MM.geo, G = MM.G; if (!g || !G || !MM.on) return;
+  var st = sim.st; if (st.frozen || st.pw || st.colour) return;                             // those taps belong to calipers, the gate and the colour box
+  var px = (ev.clientX - r.left) / r.width * g.EW, py = (ev.clientY - r.top) / r.height * g.EH, a = (px - g.x0) / g.sx, b = (py - g.y0) / g.sy, c;
+  if (G.type === 'linear') c = a / G.W + 0.5; else { var th = Math.atan2(a, b + G.R); if (Math.abs(th) > G.half) return; c = (th + G.half) / (2 * G.half); }
+  if (c < 0 || c > 1) return; MM.line = c * (MM.NL - 1); MM.pts = []; mmReadout(); sim.redraw();
+}
+function mmMeasure(ev) {                                                                    // two taps on the strip: depth and time between them
+  var cv = MM.cv, r = cv.getBoundingClientRect(), x = (ev.clientX - r.left) / r.width * cv.width, y = (ev.clientY - r.top) / r.height * cv.height;
+  if (MM.pts.length >= 2) MM.pts = []; MM.pts.push([x, y]);
+  var cx = MM.cx; cx.fillStyle = '#E0A458'; cx.beginPath(); cx.arc(x, y, 3.5, 0, 6.3); cx.fill();
+  if (MM.pts.length === 2) { var p = MM.pts; cx.strokeStyle = '#E0A458'; cx.setLineDash([3, 3]); cx.beginPath(); cx.moveTo(p[0][0], p[0][1]); cx.lineTo(p[1][0], p[1][1]); cx.stroke(); cx.setLineDash([]); }
+  mmReadout();
+}
+function mmReadout() {
+  if (!MM.out) return; var p = MM.pts;
+  if (p.length < 2) { MM.out.textContent = p.length ? 'Tap the second point.' : (sim && sim.st.frozen ? 'Frozen. Tap two points on the strip to measure.' : 'Freeze, then tap two points on the strip to measure. Tap the image to move the M-mode line.'); return; }
+  var mm = Math.abs(p[1][1] - p[0][1]) / MM.H * MM.D, ms = Math.abs(p[1][0] - p[0][0]) / MM.SWEEP * 1000;
+  MM.out.textContent = 'Along the beam ' + mm.toFixed(1) + ' mm · across ' + Math.round(ms) + ' ms (simulator scale)';
+}
+function mmSetup() {
+  var bm = document.getElementById('pb-bm'), tb = document.querySelector('.pb-img .pb-tb'); if (!bm || !tb) return;
+  var wrap = document.createElement('div'); wrap.hidden = true; wrap.id = 'cp-mm';
+  wrap.innerHTML = '<canvas class="pb-strip" width="512" height="' + MM.H + '" role="img" aria-label="M-mode strip along the chosen scan line: depth downward, time left to right. Tap two points to measure."></canvas><p class="cp-mmo" aria-live="polite"></p>';
+  bm.parentNode.insertBefore(wrap, bm.nextSibling); MM.cv = wrap.firstChild; MM.cx = MM.cv.getContext('2d'); MM.out = wrap.lastChild;
+  var b = document.createElement('button'); b.type = 'button'; b.id = 'cp-mmb'; b.textContent = 'M-mode'; b.setAttribute('aria-pressed', 'false');
+  var mg = document.querySelector('.pb-img .pbc-modes'); b.className = 'pbc-key'; if (mg) { b.textContent = 'M'; b.title = 'M-mode'; mg.appendChild(b); } else tb.appendChild(b);
+  b.addEventListener('click', function () { MM.on = !MM.on; b.setAttribute('aria-pressed', MM.on ? 'true' : 'false'); wrap.hidden = !MM.on; MM.x = 0; MM.t = null; MM.pts = []; MM.cx.fillStyle = '#000'; MM.cx.fillRect(0, 0, MM.cv.width, MM.H); mmReadout(); sim.redraw(); });
+  bm.addEventListener('click', mmPick); MM.cv.addEventListener('click', mmMeasure);
+  sim.mm = MM; sim.LM = LM;                                                                // for tests and the console
+  sim.on('viewchange', function () { MM.line = null; MM.pts = []; mmReadout(); });
+  setInterval(function () { if (MM.on && MM.pts.length < 2) mmReadout(); }, 700);
 }
 
 /* ---------------- ECG strip on the image */
 function ecgWave(ph, af, x) { var g = function (c, w, a) { var d = ((ph - c + 1.5) % 1) - 0.5; return a * Math.exp(-d * d / (2 * w * w)); }; return g(0, 0.012, 1) + g(-0.035, 0.01, -0.18) + g(0.035, 0.012, -0.25) + g(0.33, 0.05, 0.28) + (af ? 0.05 * Math.sin(x * 0.9) + 0.03 * Math.sin(x * 2.3) : g(0.84, 0.03, 0.13)); }
 function overlay(bx, o) {
+  if (MM.on) mmOverlay(bx, o);
   var x0 = 272, x1 = o.EW - 34, yb = o.EH - 14, amp = 15, beats = 2, ph = PH.ph, af = !!(sim && sim.S && sim.S.af);
   bx.strokeStyle = '#78D2C4'; bx.lineWidth = 1.3; bx.beginPath();
   if (af) { var b0 = Math.floor(PH.beats) - 1, xx = x0, segs = []; for (var k = 0; k < 3; k++) { var L = RRS[((b0 + k) % RRS.length + RRS.length) % RRS.length], px = L / (2 * PH.rr) * (x1 - x0); segs.push(px); } beats = 1;
@@ -607,7 +667,7 @@ var VARIANTS = [
   { id: 'dcm', name: 'Dilated LV with severely reduced systolic function', answer: 'Dilated LV with severely reduced systolic function', group: 'Ventricular function', view: 'plax', views: ['plax', 'psax-pm', 'a4c', 'a2c'],
     apply: function (S) { S.lvCav = 1.38; S.lvWall = 0.72; S.ef = 0.3; S.hr = Math.max(S.hr, 92); S.jets.push(jet(LM.MV, sub(LAC, LM.MV), T.LVB, T.LAB, 'sys', 380, 38, 2.5, 14, 8)); S.focus = { p: LM.MV }; },
     teach: ex('A large, round LV whose walls barely thicken, a wide mitral annulus with a central systolic jet into the LA on colour, and a fast rate.',
-      ['PLAX: the cavity is wide at end-diastole (normal LVIDd is 42–58 mm in men and 38–52 mm in women: Lang 2015 · PMID 25559473) and the anterior mitral leaflet opens far short of the septum. E-point septal separation over 7 mm had 100% sensitivity (8 of 8; 95% CI 62.9–100) but 52% specificity for EF ≤30% in one single-centre convenience sample admitted through the ED (McKaigney 2014 · PMID 24630604 ⚑): use it to rule out a severely reduced EF, not to measure one.', 'PSAX mid-papillary: watch the whole ring. Global hypokinesia thickens nowhere; a regional defect spares one wall.', 'A4C: estimate the EF by eye in categories. Normal 52–72% (men) and 54–74% (women); mildly reduced 41–51 / 41–53; moderately 30–40; severely under 30 (Lang 2015).', 'Then the consequences: LA size, functional MR on colour (recognition only), IVC and B-lines for congestion (Sessions 5 and 3).'],
+      ['PLAX: the cavity is wide at end-diastole (normal LVIDd is 42–58 mm in men and 38–52 mm in women: Lang 2015 · PMID 25559473) and the anterior mitral leaflet opens far short of the septum. E-point septal separation over 7 mm had 100% sensitivity (8 of 8; 95% CI 62.9–100) but 52% specificity for EF ≤30% in one single-centre convenience sample admitted through the ED (McKaigney 2014 · PMID 24630604 ⚑): use it to rule out a severely reduced EF, not to measure one. EPSS is measured by M-mode through the mitral leaflet tips; this heart model has no leaflets, so practise it on real clips.', 'PSAX mid-papillary: watch the whole ring. Global hypokinesia thickens nowhere; a regional defect spares one wall.', 'A4C: estimate the EF by eye in categories. Normal 52–72% (men) and 54–74% (women); mildly reduced 41–51 / 41–53; moderately 30–40; severely under 30 (Lang 2015).', 'Then the consequences: LA size, functional MR on colour (recognition only), IVC and B-lines for congestion (Sessions 5 and 3).'],
       ['Foreshortening makes a normal LV look round and globular: the apical error of this simulator.', 'Tachycardia and AF shorten filling; estimate over several beats.', 'A severely reduced EF in a dialysis patient changes the ultrafiltration plan more than any single number on the chart.'],
       'Focused POCUS gives the category, not the number. Formal EF (biplane Simpson), diastolic grading (Nagueh 2025 · PMID 40617625) and the MR grade need a comprehensive echo.') },
   { id: 'lvh', name: 'Concentric LVH with a small, vigorous cavity', answer: 'Concentric hypertrophy with a small, vigorous cavity', group: 'Ventricular function', view: 'plax', views: ['plax', 'psax-pm', 'a4c'],
@@ -625,7 +685,7 @@ var VARIANTS = [
   { id: 'rvdil', name: 'Dilated RV with septal flattening', answer: 'Right ventricular dilation with septal flattening', group: 'Ventricular function', view: 'a4c', views: ['a4c', 'psax-pm', 'subx', 'plax', 'ivc'],
     apply: function (S) { S.rvDil = 1.45; S.ivcDil = 1.4; },
     teach: ex('In A4C the RV is as large as or larger than the LV and shares the apex; in PSAX the septum is flat and the LV is D-shaped; the IVC is plethoric.',
-      ['A4C: compare basal diameters at end-diastole. The RV is normally no more than two-thirds of the LV, and an RV larger than the LV is likely significantly enlarged (Rudski 2010 · PMID 20620859, qualitative); basal RV over 41 mm is enlarged (Lang 2015 · PMID 25559473).', 'PSAX mid-papillary: when does the septum flatten? In systole it is pressure overload (pulmonary hypertension, PE); in diastole it suggests volume overload (e.g. TR, atrial septal defect); a D-shaped septum is not diagnostic on its own (Rudski 2010).', 'RV function: TAPSE under 17 mm, fractional area change under 35% or S′ under 9.5 cm/s is abnormal (Lang 2015). TAPSE needs M-mode and is a Session 4 skill; it is not drawn here.', 'IVC and hepatic veins (Session 5, VExUS) read the venous side of the same problem.'],
+      ['A4C: compare basal diameters at end-diastole. The RV is normally no more than two-thirds of the LV, and an RV larger than the LV is likely significantly enlarged (Rudski 2010 · PMID 20620859, qualitative); basal RV over 41 mm is enlarged (Lang 2015 · PMID 25559473).', 'PSAX mid-papillary: when does the septum flatten? In systole it is pressure overload (pulmonary hypertension, PE); in diastole it suggests volume overload (e.g. TR, atrial septal defect); a D-shaped septum is not diagnostic on its own (Rudski 2010).', 'RV function: TAPSE under 17 mm, fractional area change under 35% or S′ under 9.5 cm/s is abnormal (Lang 2015). TAPSE on the M-mode strip: press M, tap the lateral tricuspid annulus to put the line through it, freeze, and measure how far the annulus moves from peak to trough (simulator scale).', 'IVC and hepatic veins (Session 5, VExUS) read the venous side of the same problem.'],
       ['A foreshortened or lateral A4C makes the RV look dilated: find the true apex first.', 'Acute RV strain with a hyperdynamic apex (McConnell sign) points to pulmonary embolism; a dilated RV with a thick free wall (over 5 mm) is chronic.', 'The dialysis patient with an arteriovenous fistula and a dilated RV may have high-output failure: ask about the fistula flow.'],
       'Say dilated or not, apex-forming or not, septum flat in systole or diastole, and the IVC. Pressures (TR velocity) are Session 6 and comprehensive echo.') },
 
@@ -766,7 +826,7 @@ function reportCard() {
     f('RV', row('Size relative to LV (A4C)', opt('rvs', [['', '—'], ['smaller', 'Smaller'], ['similar', 'Similar'], ['larger', 'Larger'], NA])) +
       row('Septal shape in PSAX', opt('sept', [['', '—'], ['round', 'Round'], ['dsys', 'D-shaped in systole'], ['ddia', 'D-shaped in diastole'], NA])) +
       row('Free-wall motion', opt('rvm', [['', '—'], ['normal', 'Normal'], ['reduced', 'Reduced'], NA])) +
-      row('TAPSE', '<input type="text" id="rp-tapse" placeholder="e.g. not measured" style="width:auto;min-width:12em">') +
+      row('TAPSE', '<input type="text" id="rp-tapse" placeholder="e.g. 19 mm on the M-mode strip, or not measured" style="width:auto;min-width:12em">') +
       '<span class="rp-src">Name the threshold with it: TAPSE under 17 mm is abnormal (Lang 2015 · PMID 25559473 · DOI 10.1016/j.echo.2014.10.003).</span>') +
     f('Valves', row('Gross abnormality on colour', opt('valv', YN)) + '<span class="rp-src">Yes or no only. No grading in a focused study.</span>') +
     f('Not assessable', '<textarea id="rp-na" rows="4" placeholder="Every question the views could not answer"></textarea><span class="rp-src">Filled from the views you did not obtain and the fields you marked not assessable; edit freely.</span>') +
@@ -885,7 +945,7 @@ function start() {
   var card = document.createElement('details'); card.className = 'pb-card'; card.id = 'cp-list';
   card.innerHTML = '<summary>Session 4 skills checklist: what this simulator practises</summary>' +
     '<h3>Practised here</h3><ul><li>Step 1, machine and preset: marker side, and the mirrored-image error.</li><li>Steps 3 to 6, acquisition: PLAX, PSAX, apical four-chamber, subxiphoid. Use “Find the view”.</li><li>Step 7, optimisation: depth, gain, far-field gain, sector width.</li></ul>' +
-    '<h3>Practised here since phase 3</h3><ul><li>Steps 10 to 13: effusion and its size, the pleural mimic, chamber collapse, tamponade physiology.</li><li>Step 14, visual LVEF categories, on the dilated and the hyperdynamic archetypes.</li><li>Step 16, RV against LV size, on the dilated RV.</li><li>Valve recognition (preview of Session 6): calcific AS, MR, AR, TR, annular calcification.</li></ul><h3>Not simulated yet</h3><ul><li>Step 8, clip recording.</li><li>Steps 15 and 17: EPSS and TAPSE by M-mode (the 2D correlates are shown).</li><li>Spectral Doppler and respiratory variation.</li></ul>' +
+    '<h3>Practised here since phase 3</h3><ul><li>Steps 10 to 13: effusion and its size, the pleural mimic, chamber collapse, tamponade physiology.</li><li>Step 14, visual LVEF categories, on the dilated and the hyperdynamic archetypes.</li><li>Step 16, RV against LV size, on the dilated RV.</li><li>Valve recognition (preview of Session 6): calcific AS, MR, AR, TR, annular calcification.</li><li>Step 17, TAPSE on the M-mode strip in A4C (press M; simulator scale).</li></ul><h3>Not simulated yet</h3><ul><li>Step 8, clip recording.</li><li>Step 15, EPSS: M-mode works, but this heart model has no mitral leaflets.</li><li>Spectral Doppler and respiratory variation.</li></ul>' +
     '<h3>Practised in the report panel</h3><ul><li>Steps 9, 19 and 20: adequacy statement (views obtained, limited or not, and image quality), the structured report, and escalation. “Check against the finding shown” compares your categories with the loaded archetype.</li></ul>' +
     '<h3>Bedside only</h3><ul><li>Step 2, patient positioning.</li><li>Step 18, scope discipline with a real patient in front of you.</li></ul>';
   var rc = document.createElement('div'); rc.className = 'pb-card'; rc.id = 'cp-real';
@@ -926,7 +986,7 @@ function start() {
     '<li><b>CKD patterns</b>: mitral annular and aortic valve calcification, functional MR and TR from dilated chambers, device-lead TR, endocarditis risk with catheters (a mobile mass on a leaflet is an urgent referral).</li>' +
     '<li><b>Pitfalls</b>: low gain hides jets, low Nyquist aliases normal inflow, wall-hugging jets look small, calcium shadows what lies behind it.</li></ol>' +
     '<p class="pb-muted">⚑ = single emergency-department series, not a guideline threshold. The valve module previews Session 6 material for recognition only.</p>';
-  var foot = document.querySelector('.pb-foot'); foot.parentNode.insertBefore(rc, foot); var rpc = reportCard(); foot.parentNode.insertBefore(rpc, rc); foot.parentNode.insertBefore(pc, rpc); foot.parentNode.insertBefore(card, pc); foot.parentNode.insertBefore(clipLibrary(), card); syncPhys();
+  var foot = document.querySelector('.pb-foot'); mmSetup(); foot.parentNode.insertBefore(rc, foot); var rpc = reportCard(); foot.parentNode.insertBefore(rpc, rc); foot.parentNode.insertBefore(pc, rpc); foot.parentNode.insertBefore(card, pc); foot.parentNode.insertBefore(clipLibrary(), card); syncPhys();
 }
 load().then(start).catch(function (e) {
   var m = document.getElementById('cp-msg'); if (m) m.textContent = 'The heart model could not be loaded (' + (e && e.message ? e.message : 'error') + '). Reload the page to try again.';
