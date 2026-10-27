@@ -66,6 +66,15 @@ html[data-theme="dark"]{background:#1B1013;color:#F3E7E8}html[data-theme="dark"]
 #cp-list h3{font-family:var(--font-display);font-weight:600;font-size:18.5px;margin:12px 0 4px}
 #cp-list ul{margin:0;padding-left:20px;max-width:72ch;list-style:"\2013  "}#cp-list li::marker{color:var(--teal)}
 #cp-list li{margin:2px 0}
+[hidden]{display:none!important}
+#cp-audit summary{cursor:pointer;font-family:var(--font-display);font-weight:600;font-size:21px;line-height:1.15;min-height:44px;display:flex;align-items:center;gap:10px}
+#cp-audit h3{font-family:var(--font-display);font-weight:600;font-size:18.5px;margin:14px 0 4px}
+#cp-audit ul{margin:0;padding-left:20px;max-width:76ch;list-style:"\2013  "}#cp-audit li::marker{color:var(--teal)}#cp-audit li{margin:3px 0}
+#cp-audit .au-tag{font:600 12px/1 var(--font-body,system-ui);letter-spacing:.08em;text-transform:uppercase;border:1px solid currentColor;border-radius:999px;padding:4px 9px;color:var(--muted,#6b5b5d)}
+#cp-audit .au-tw{overflow-x:auto;margin-top:6px}#cp-audit table{border-collapse:collapse;width:100%;font-size:14.5px;line-height:1.4}
+#cp-audit th,#cp-audit td{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid var(--line,#ddd)}#cp-audit th{font-weight:600;white-space:nowrap}
+#cp-audit td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+#cp-audit a{color:var(--teal)}
 </style>
 <!-- three.js r160 ES-module build through an import map (one copy of three shared with GLTFLoader); sim-engine.js imports it lazily -->
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
@@ -654,7 +663,7 @@ var VARIANTS = [
   { id: 'tamp', name: 'Tamponade: effusion with chamber collapse', answer: 'Tamponade physiology (effusion with chamber collapse)', group: 'Pericardium', view: 'subx', views: ['subx', 'a4c', 'plax', 'psax-pm', 'ivc'],
     apply: function (S) { S.eff = 26; S.effPost = 0.3; S.tamp = true; S.swing = 1; S.ivcDil = 1.45; S.hr = Math.max(S.hr, 115); },
     teach: ex('A large effusion, a heart swinging inside it at a fast rate, the RV free wall buckling inward in early diastole and the RA wall in late diastole, and a fat IVC that does not collapse.',
-      ['Tamponade is a clinical diagnosis (hypotension, tachycardia, raised JVP); the scan supports it. Scan while someone checks the blood pressure.', 'Subxiphoid and A4C: freeze and scroll. RV free-wall inversion in early diastole (when the mitral valve is open) is the specific sign; RA inversion lasting more than a third of the cycle is sensitive and specific (Klein 2013 · PMID 23998693).', 'IVC: dilated with under 50% inspiratory collapse is present in nearly every tamponade and its absence argues against it (Klein 2013). This simulator shows the size; measure on the Session 5 simulator.', 'Respiratory variation of mitral inflow over 30% and tricuspid over 60% needs pulsed Doppler (Session 6); it is not modelled here.'],
+      ['Tamponade is a clinical diagnosis (hypotension, tachycardia, raised JVP); the scan supports it. Scan while someone checks the blood pressure.', 'Subxiphoid and A4C: freeze and scroll. RV free-wall inversion in early diastole (when the mitral valve is open) is highly specific (Gajjar 2026 · PMID 41835345); RA inversion lasting more than a third of the cycle is nearly 100% sensitive and specific (Klein 2013 · PMID 23998693).', 'IVC: dilated with under 50% inspiratory collapse is present in nearly every tamponade and its absence argues against it (Klein 2013). This simulator shows the size; measure on the Session 5 simulator.', 'Respiratory variation of mitral inflow over 30% and tricuspid over 60% needs pulsed Doppler (Session 6); it is not modelled here.'],
       ['Collapse is phase-specific. RV collapse in systole is normal contraction; the finding is diastolic inversion.', 'Positive-pressure ventilation and raised right-sided pressures blunt collapse and IVC change; a loculated post-surgical collection can tamponade one chamber without a circumferential effusion.', 'Hypovolaemia (a post-dialysis patient) makes chambers collapse with a smaller effusion.'],
       'This is an escalation finding: say the words “pericardial effusion with echocardiographic signs of tamponade”, keep the probe on, and call for pericardiocentesis-capable help. Do not wait for pulsus paradoxus.') },
   { id: 'pleural', name: 'Left pleural effusion mimicking pericardial fluid', answer: 'Pleural effusion, not pericardial', group: 'Pericardium', view: 'plax', views: ['plax', 'psax-pm'],
@@ -692,7 +701,7 @@ var VARIANTS = [
   { id: 'as', name: 'Calcific aortic stenosis', answer: 'Calcific aortic stenosis', group: 'Valves', view: 'plax', views: ['plax', 'psax-av', 'a5c', 'a3c'],
     apply: function (S) { S.calcAV = true; S.lvCav = 0.86; S.lvWall = 1.35; S.asJet = true; S.jets.push(jet(LM.AV, sub(LINES.AAo[2], LINES.AAo[0]), T.LVB, T.VES, 'sys', 400, 42, 4, 10, 10)); S.focus = { p: LINES.AAo[1] }; },
     teach: ex('Bright, shadowing calcium on the aortic leaflets that barely separate in systole, a thick-walled LV, and a mosaic systolic jet filling the aortic root on colour.',
-      ['PLAX: leaflet thickness and excursion in systole, calcium with its shadow, post-stenotic dilatation of the ascending aorta, and the wall thickness it has produced. PSAX at the aortic valve: how many cusps move and how small the orifice looks.', 'A5C and A3C align the beam with the jet: colour shows aliasing in the LVOT and aorta in systole. Grading needs continuous-wave Doppler: severe is peak velocity ≥4 m/s, mean gradient ≥40 mmHg, valve area ≤1.0 cm² (EACVI/ASE 2017, Baumgartner · PMID 28385280).', 'The 2D question for a focused study is “is there calcific valve disease, and is the ventricle paying for it?”, not the grade.'],
+      ['PLAX: leaflet thickness and excursion in systole, calcium with its shadow, post-stenotic dilatation of the ascending aorta, and the wall thickness it has produced. PSAX at the aortic valve: how many cusps move and how small the orifice looks.', 'A5C and A3C align the beam with the jet: colour shows aliasing in the LVOT and aorta in systole. Grading needs continuous-wave Doppler: severe is peak velocity ≥4 m/s, mean gradient ≥40 mmHg, valve area under 1.0 cm² (EACVI/ASE 2017, Baumgartner · PMID 28385280).', 'The 2D question for a focused study is “is there calcific valve disease, and is the ventricle paying for it?”, not the grade.'],
       ['Aortic sclerosis (calcium, free motion, velocity under 2.5 m/s) is far commoner than stenosis and looks similar in 2D.', 'A low-flow state (the poor LV of the dialysis patient) gives a low gradient despite severe stenosis; gradient alone misleads (Baumgartner 2017).', 'Calcium at the annulus shadows the posterior structures: change the view rather than the gain.'],
       'Calcific aortic valve disease is common in long-term dialysis. Refer for comprehensive echo with Doppler grading; do not report a severity from colour.') },
   { id: 'mr', name: 'Mitral regurgitation', answer: 'Mitral regurgitation', group: 'Valves', view: 'a4c', views: ['a4c', 'plax', 'a3c', 'a2c'],
@@ -704,7 +713,7 @@ var VARIANTS = [
   { id: 'ar', name: 'Aortic regurgitation', answer: 'Aortic regurgitation', group: 'Valves', view: 'plax', views: ['plax', 'a5c', 'a3c'],
     apply: function (S) { S.jets.push(jet(LM.AV, sub(add(LM.LV, [6, -6, 2]), LM.AV), T.VES, T.LVB, 'dia', 420, 55, 3, 12, 8)); S.focus = { p: LM.AV }; },
     teach: ex('In diastole a mosaic jet enters the LVOT from the aortic valve and runs along the anterior mitral leaflet toward the apex.',
-      ['PLAX with the colour box over the LVOT: the jet fills diastole, starting at the valve. Compare its width with the LVOT: a jet width over 65% of the outflow tract supports severe (Zoghbi 2017 · PMID 28314623).', 'A5C and A3C align with the jet for Doppler: vena contracta over 6 mm, pressure half-time under 200 ms and holodiastolic flow reversal in the descending aorta are severe criteria (Zoghbi 2017), all Session 6 measurements.', '2D: a dilated aortic root (Marfan clip in the reference set), bicuspid valve, endocarditis vegetation, and the LV dilatation of chronic AR.'],
+      ['PLAX with the colour box over the LVOT: the jet fills diastole, starting at the valve. Compare its width with the LVOT: a jet width of 65% or more of the outflow tract supports severe (Zoghbi 2017 · PMID 28314623).', 'A5C and A3C align with the jet for Doppler: vena contracta over 6 mm, pressure half-time under 200 ms and holodiastolic flow reversal in the descending aorta are severe criteria (Zoghbi 2017), all Session 6 measurements.', '2D: a dilated aortic root (Marfan clip in the reference set), bicuspid valve, endocarditis vegetation, and the LV dilatation of chronic AR.'],
       ['Normal diastolic mitral inflow aliases at a low Nyquist limit and sits next to the jet; follow the jet back to the aortic valve.', 'Acute severe AR (dissection, endocarditis) can have a short, unimpressive jet with a hyperdynamic LV and premature mitral closure.'],
       'Report “diastolic regurgitant jet from the aortic valve, in two views” and refer. Acute AR with hypotension is an emergency call, not a measurement.') },
   { id: 'tr', name: 'Tricuspid regurgitation', answer: 'Tricuspid regurgitation', group: 'Valves', view: 'a4c', views: ['a4c', 'rvit', 'subx', 'ivc'],
@@ -797,6 +806,56 @@ function rExpect(id) {
   return o;
 }
 var RLAB = { eff: 'Effusion', ao: 'Relation to the descending aorta', rac: 'RA systolic collapse', rvc: 'RV diastolic collapse', lvs: 'LV size', lvf: 'LV function category', wall: 'LV wall thickening', rvs: 'RV size relative to LV', sept: 'Septal shape in PSAX', valv: 'Gross valve abnormality on colour' };
+/* ---- Author audit (Roadmap WP1, 26 Oct 2026). Shown only to the author: the #review hash, or the Bench's
+   "Author tools" switch (localStorage pb.review = 1, shared with the Bench page). Learners never see it. ---- */
+function isReview() {
+  if (location.hash === '#review') return true;
+  try { if (window.parent !== window && window.parent.location.hash === '#review') return true; } catch (e) {}
+  try { return localStorage.getItem('pb.review') === '1'; } catch (e) { return false; }
+}
+var AUDIT_SRC = [
+  ['Koratala 2024', '39502372', 'Held', 'Scope; IAPN basic and orientation views'],
+  ['Mitchell 2019', '30282592', '⚑ Not held', 'What a comprehensive study contains'],
+  ['Neskovic 2018', '29529170', 'Held on the Bench; register says upload needed', 'Focused cardiac curriculum wording'],
+  ['Argaiz 2021', '35369665', 'Held', 'Reading the heart with the IVC and lungs'],
+  ['Alerhand 2019', '30471929', '⚑ Not held', 'Tamponade signs (with Klein and Gajjar)'],
+  ['Kirkpatrick 2024', '39230540', 'Held', 'Report nomenclature and fields'],
+  ['Lang 2015', '25559473', 'Held', 'LV, RV and wall normals; TAPSE under 17 mm'],
+  ['Rudski 2010', '20620859', 'Held on the Bench; register says upload needed', 'RV against LV size'],
+  ['Klein 2013', '23998693', 'Read 26 Oct (free ASE PDF)', 'Effusion size; RA collapse over a third of the cycle; IVC in tamponade'],
+  ['Gajjar 2026', '41835345', 'Held (open access)', 'RV early-diastolic collapse is highly specific'],
+  ['Adler 2015', '26320112', 'Held on the Bench; register says not open access', 'Tamponade is a clinical diagnosis; speed of accumulation'],
+  ['Zoghbi 2017', '28314623', 'Read 26 Oct (free ASE PDF)', 'MR, TR and AR severity criteria'],
+  ['Baumgartner 2017', '28385280', 'Read 26 Oct (free ASE PDF)', 'Severe aortic stenosis criteria'],
+  ['Nagueh 2025', '40617625', 'Held', 'Diastolic grading is outside the focused study'],
+  ['McKaigney 2014', '24630604', 'Held; its ⚑ here marks a single ED series', 'EPSS over 7 mm (not practisable: no leaflets)']
+];
+function auditCard() {
+  var d = document.createElement('details'); d.className = 'pb-card'; d.id = 'cp-audit';
+  var rows = AUDIT_SRC.map(function (r) {
+    return '<tr><td>' + r[0] + '</td><td class="n"><a href="https://pubmed.ncbi.nlm.nih.gov/' + r[1] + '/" target="_blank" rel="noopener">' + r[1] + '</a></td><td>' + r[2] + '</td><td>' + r[3] + '</td></tr>';
+  }).join('');
+  d.innerHTML = '<summary>Author audit <span class="au-tag">Hidden from learners</span></summary>' +
+    '<h3>What the model cannot show</h3><ul>' +
+    '<li>Scale is set at 1.3 mm per voxel so the LV end-diastolic diameter is about 4.5 cm; every measurement is “simulator scale”.</li>' +
+    '<li>Walls are drawn thick: do not read wall thickness off the image.</li>' +
+    '<li>No valve leaflets: EPSS cannot be practised; valve findings are flow jets and calcium only.</li>' +
+    '<li>22 frames per beat: the M-mode trace is stepped and timing is coarse.</li>' +
+    '<li>Every pathology is a warp of one normal heart (composite archetype); the 3D heart always shows the normal model.</li></ul>' +
+    '<h3>Sources behind the numbers on this page</h3><p class="pb-muted">Every PMID checked against PubMed on 26 Oct 2026.</p>' +
+    '<div class="au-tw"><table><thead><tr><th>Source</th><th>PMID</th><th>Full text</th><th>Used here for</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<h3>Corrected on 26 Oct</h3><ul>' +
+    '<li>“RV collapse is the specific sign” was cited to Klein 2013, which does not say it; now cited to Gajjar 2026, which does. Klein’s own figure kept: RA collapse over a third of the cycle is nearly 100% sensitive and specific.</li>' +
+    '<li>Severe aortic stenosis area: “≤1.0 cm²” → “under 1.0 cm²” (Baumgartner 2017), in two places.</li>' +
+    '<li>Aortic regurgitation jet width: “over 65%” → “65% or more” of the outflow tract (Zoghbi 2017).</li>' +
+    '<li>The IVC line in the tamponade checklist had no source; now Klein 2013 (over 90% of tamponade; not specific).</li>' +
+    '<li>Mitchell 2019 now carries its ⚑, as on the Bench. Klein, Zoghbi and Baumgartner added to the register.</li></ul>' +
+    '<h3>Open questions</h3><ul>' +
+    '<li>⚑ means two things on this page: “unread or abstract-level source” (the Bench meaning) and, for McKaigney, “single emergency-department series”, although McKaigney is held. Keep both, or restate the McKaigney caveat in words?</li>' +
+    '<li>The ⚑ on three view-note lines (descending-aorta landmark, apex position, subxiphoid aim) marks standard technique with no paper behind it.</li>' +
+    '<li>The register still lists Rudski 2010, Neskovic 2018 and Adler 2015 as not held, while the Bench’s evidence list holds them.</li></ul>';
+  return d;
+}
 function reportCard() {
   var opt = function (id, list) { return '<select id="rp-' + id + '">' + list.map(function (o) { return '<option value="' + o[0] + '">' + o[1] + '</option>'; }).join('') + '</select>'; };
   var NA = ['na', 'Not assessable'], YN = [['', '—'], ['no', 'No'], ['yes', 'Yes'], NA];
@@ -938,7 +997,7 @@ function start() {
     slideLabels: ['Slide along the body (head / feet)', 'Slide around the chest'],
     notes: '<h3>Scope</h3><ul><li>Session 4 is two-dimensional and question-driven: pericardium, LV squeeze, RV size.</li><li>IAPN basic views: PLAX, PSAX, apical four- and five-chamber, subxiphoid, IVC.</li><li>“Orientation only” views are outside the Session 4 checklist.</li><li>A limited cardiac POCUS study. Not a comprehensive echocardiogram.</li></ul>' +
       '<h3>Reading this simulator</h3><ul><li>The heart is a 3D model beating through one cycle. Chest wall, ribs, lungs and liver are modelled around it.</li><li>“Finding shown” lists acquisition errors (how a normal heart was scanned) and pathology archetypes (geometric and acoustic changes to the same normal model, with colour Doppler for the valve jets). The 3D heart on the right always shows the normal model.</li><li>Colour Doppler here is for recognition: jets appear on the far side of a closed valve in the right phase and alias at the Nyquist limit. Grading needs spectral Doppler and a comprehensive echo.</li><li>Scale is approximate and the walls are drawn thick: do not read chamber size or wall thickness off it.</li><li>Freeze and tap twice for a caliper.</li></ul>' +
-      '<p class="pb-muted">Wording follows Session 4 of the Bench. IAPN 2024 · PMID 39502372 · Mitchell 2019 · PMID 30282592 · Neskovic 2018 · PMID 29529170 · Argaiz 2021 · PMID 35369665 · Alerhand 2019 · PMID 30471929 ⚑. Pathology reference values: Lang 2015 · PMID 25559473 · Rudski 2010 · PMID 20620859 · Klein 2013 · PMID 23998693 · Adler 2015 · PMID 26320112 · Zoghbi 2017 · PMID 28314623 · Baumgartner 2017 · PMID 28385280 · Nagueh 2025 · PMID 40617625 · McKaigney 2014 · PMID 24630604 ⚑.</p><p class="pb-muted">⚑ = standard technique, or an abstract-level source, as flagged on the Bench.</p>',
+      '<p class="pb-muted">Wording follows Session 4 of the Bench. IAPN 2024 · PMID 39502372 · Mitchell 2019 · PMID 30282592 ⚑ · Neskovic 2018 · PMID 29529170 · Argaiz 2021 · PMID 35369665 · Alerhand 2019 · PMID 30471929 ⚑. Pathology reference values: Lang 2015 · PMID 25559473 · Rudski 2010 · PMID 20620859 · Klein 2013 · PMID 23998693 · Gajjar 2026 · PMID 41835345 · Adler 2015 · PMID 26320112 · Zoghbi 2017 · PMID 28314623 · Baumgartner 2017 · PMID 28385280 · Nagueh 2025 · PMID 40617625 · McKaigney 2014 · PMID 24630604 ⚑.</p><p class="pb-muted">⚑ = standard technique, or an abstract-level source, as flagged on the Bench.</p>',
     footer: 'Session 4: focused cardiac ultrasound. 3D heart model from TTESim, used with permission. Read the heart with the IVC (Session 5) and the lungs (Session 3).'
   });
   window.simCardiac = sim; window.sim = sim;
@@ -965,7 +1024,7 @@ function start() {
     '<li><b>PLAX</b>: find the descending aorta behind the LA. Pericardial fluid passes in front of it; pleural fluid lies behind it.</li>' +
     '<li><b>Size</b> the largest pocket at end-diastole: under 10 mm small, 10–20 mm moderate, over 20 mm large (Klein 2013 · PMID 23998693). Say where it is.</li>' +
     '<li><b>Collapse</b>: freeze and step through the cycle. RA inversion in late diastole lasting more than a third of the cycle; RV free-wall inversion in early diastole (mitral valve open).</li>' +
-    '<li><b>IVC</b>: over 21 mm with under 50% collapse supports tamponade and is nearly always present (Session 5 simulator).</li>' +
+    '<li><b>IVC</b>: over 21 mm with under 50% collapse is present in over 90% of tamponade, but is not specific (Klein 2013 · PMID 23998693; Session 5 simulator).</li>' +
     '<li><b>Clinical correlation</b>: blood pressure, heart rate, JVP, ventilation. Tamponade is judged clinically, with echocardiography the key supporting test (ESC 2015, Adler · PMID 26320112).</li>' +
     '<li><b>Mimics</b>: epicardial fat, pleural effusion, ascites, loculated post-operative collections. Over-gain erases small effusions.</li>' +
     '<li><b>Escalate</b> on collapse signs or haemodynamic compromise; a stable large uraemic effusion is followed with comprehensive echo and intensified dialysis.</li></ol>' +
@@ -982,11 +1041,16 @@ function start() {
     '<li><b>2D first</b>: leaflet thickness, calcium and its shadow, mobility, and the chambers downstream (LA size, LV size and wall thickness, RV size).</li>' +
     '<li><b>Colour</b>: box over the valve, Nyquist 50–60 cm/s, gain just below the level that speckles the tissue. A regurgitant jet appears on the far side of a closed valve in the right phase: systole for MR and TR, diastole for AR.</li>' +
     '<li><b>Two views</b> before you believe a jet; describe its direction.</li>' +
-    '<li><b>What a focused study cannot do</b>: grade severity. Severe AS is Vmax ≥4 m/s, mean gradient ≥40 mmHg, area ≤1.0 cm² (Baumgartner 2017 · PMID 28385280); severe MR or TR has a vena contracta ≥7 mm and effective orifice ≥0.4 cm²; severe AR has a vena contracta over 6 mm and pressure half-time under 200 ms (Zoghbi 2017 · PMID 28314623). All need spectral Doppler (Session 6) in a comprehensive echo.</li>' +
+    '<li><b>What a focused study cannot do</b>: grade severity. Severe AS is Vmax ≥4 m/s, mean gradient ≥40 mmHg, area under 1.0 cm² (Baumgartner 2017 · PMID 28385280); severe MR or TR has a vena contracta ≥7 mm and effective orifice ≥0.4 cm²; severe AR has a vena contracta over 6 mm and pressure half-time under 200 ms (Zoghbi 2017 · PMID 28314623). All need spectral Doppler (Session 6) in a comprehensive echo.</li>' +
     '<li><b>CKD patterns</b>: mitral annular and aortic valve calcification, functional MR and TR from dilated chambers, device-lead TR, endocarditis risk with catheters (a mobile mass on a leaflet is an urgent referral).</li>' +
     '<li><b>Pitfalls</b>: low gain hides jets, low Nyquist aliases normal inflow, wall-hugging jets look small, calcium shadows what lies behind it.</li></ol>' +
     '<p class="pb-muted">⚑ = single emergency-department series, not a guideline threshold. The valve module previews Session 6 material for recognition only.</p>';
-  var foot = document.querySelector('.pb-foot'); mmSetup(); foot.parentNode.insertBefore(rc, foot); var rpc = reportCard(); foot.parentNode.insertBefore(rpc, rc); foot.parentNode.insertBefore(pc, rpc); foot.parentNode.insertBefore(card, pc); foot.parentNode.insertBefore(clipLibrary(), card); syncPhys();
+  var foot = document.querySelector('.pb-foot'); mmSetup(); foot.parentNode.insertBefore(rc, foot); var rpc = reportCard(); foot.parentNode.insertBefore(rpc, rc); foot.parentNode.insertBefore(pc, rpc); foot.parentNode.insertBefore(card, pc); foot.parentNode.insertBefore(clipLibrary(), card);
+  var ac = auditCard(); ac.hidden = !isReview(); foot.parentNode.insertBefore(ac, foot);
+  function syncAudit() { ac.hidden = !isReview(); }
+  window.addEventListener('hashchange', syncAudit); window.addEventListener('storage', syncAudit);
+  try { if (window.parent !== window) window.parent.addEventListener('hashchange', syncAudit); } catch (e) {}
+  syncPhys();
 }
 load().then(start).catch(function (e) {
   var m = document.getElementById('cp-msg'); if (m) m.textContent = 'The heart model could not be loaded (' + (e && e.message ? e.message : 'error') + '). Reload the page to try again.';
