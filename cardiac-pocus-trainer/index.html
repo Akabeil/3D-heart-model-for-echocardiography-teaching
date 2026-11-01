@@ -28,6 +28,15 @@ html[data-theme="dark"]{background:#1B1013;color:#F3E7E8}html[data-theme="dark"]
 #cp-clips .cl-b{min-height:44px;padding:6px 12px;border-radius:var(--r-leaf);border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
 #cp-clips .cl-b[aria-pressed="true"]{background:var(--teal-fill);border-color:var(--teal-line);color:var(--teal);font-weight:600}
 #cp-clips .cl-sp[aria-pressed="true"]{background:var(--teal);color:var(--on-teal);border-color:var(--teal)}
+#cp-clip{background:#000;color:var(--scr-ink,#ECE5E4);border-top:1px solid var(--grid);padding:8px 10px;font-size:13.5px}
+#cp-clip .cl-st{margin:0 0 6px;min-height:1.3em}
+#cp-clip .cl-shelf{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+#cp-clip button{min-height:44px;padding:6px 12px;border-radius:8px;border:1px solid #4a4245;background:#1b1819;color:#ECE5E4;font:inherit;font-size:13.5px;cursor:pointer}
+#cp-clip button[aria-pressed="true"]{border-color:#E58A98;box-shadow:inset 0 0 0 1px #E58A98}
+#cp-clip canvas{display:block;width:100%;height:auto;background:#000}
+#cp-clip .cl-ctl{display:flex;align-items:center;gap:8px;margin-top:6px}
+#cp-clip .cl-ctl input[type=range]{flex:1;min-height:44px;accent-color:#E58A98}
+#cp-clip .cl-fr{font-variant-numeric:tabular-nums;white-space:nowrap}
 #cp-mm .cp-mmo{margin:0;padding:6px 10px;font-size:13.5px;color:var(--scr-ink,#ECE5E4);background:#000;border-top:1px solid var(--grid)}
 #cp-report summary{cursor:pointer;font-family:var(--font-display);font-weight:600;font-size:21px;line-height:1.15;min-height:44px;display:flex;align-items:center}
 #cp-report .rp-intro{margin:4px 0 12px;max-width:74ch}
@@ -106,11 +115,12 @@ var LM = {"MV":[39.6,-17.6,9.5],"TV":[1.8,-40.7,35.6],"AV":[14.8,8.0,27.1],"PV":
 var LVAX = nrm(sub(LM.APEX, LM.MV));
 function mid(a, b) { return mul(add(a, b), 0.5); }
 function a2w(a) { var x = (a[0] - MID) * VOX, zv = (a[1] - 75) * VOX, yv = (a[2] - 75) * VOX; return [x, cP * yv - sP * zv, sP * yv + cP * zv + ZH]; }
-var LINES = {
-  DAo: [[78, 49, 10], [79, 43, 22], [81, 35, 40], [82, 28, 58], [81, 27, 80], [80, 28, 100], [76, 33, 115]].map(a2w),
-  IVC: [[43, 68, 4], [42, 67, 28], [43, 65, 46]].map(a2w),
-  AAo: [[66, 72, 86], [64, 66, 96], [62, 59, 106]].map(a2w)
+var LINES_V = {                                    // vessel centre-lines in voxel indices (also used to split the vessel label)
+  DAo: [[78, 49, 10], [79, 43, 22], [81, 35, 40], [82, 28, 58], [81, 27, 80], [80, 28, 100], [76, 33, 115]],
+  IVC: [[43, 68, 4], [42, 67, 28], [43, 65, 46]],
+  AAo: [[66, 72, 86], [64, 66, 96], [62, 59, 106]]
 };
+var LINES = { DAo: LINES_V.DAo.map(a2w), IVC: LINES_V.IVC.map(a2w), AAo: LINES_V.AAo.map(a2w) };
 
 /* ---------------- tissues (id = index) */
 var TISSUES = [
@@ -346,6 +356,100 @@ function tissueAt(x, y, z, t, S) {
 var skin = P.geo.cylinder({ p0: [0, YB, 0], p1: [0, YT, 0], ra: RA, rb: RB, e1: [1, 0, 0] });
 function wallPt(sd, az, y, depth) { var c = Math.cos(az * D2R), s = Math.sin(az * D2R); return [sd * (RA - depth) * c, y, (RB - depth) * s]; }
 
+/* ---------------- anatomy key: the model's own blood-pool labels, shared by the 3D cut-away and the anatomy strip (2026-10-30)
+   The data file labels every blood voxel 1 RA, 2 LA, 3 RV, 4 LV, 5 vessel. The vessel label is split here, once, at load: the aorta, the
+   pulmonary artery and the IVC are each one connected piece of it, found from a seed voxel inside the piece; the aorta is then divided into
+   the ascending part with the arch (5) and the descending aorta (6) by which centre-line (LINES_V) is nearer, and the LV label above the
+   aortic valve becomes aorta (below). Any other vessel voxel keeps the colour but no name (9). Colours: right heart and veins blue, left heart red and orange, great arteries green (as the Real Heart lab). */
+var AK = [
+  null,
+  { t: 'RA', name: 'Right atrium', c: [0.36, 0.55, 0.95] },
+  { t: 'LA', name: 'Left atrium', c: [0.98, 0.62, 0.28] },
+  { t: 'RV', name: 'Right ventricle', c: [0.24, 0.34, 0.86] },
+  { t: 'LV', name: 'Left ventricle', c: [0.93, 0.30, 0.32] },
+  { t: 'Ao', name: 'Aorta', c: [0.35, 0.80, 0.45] },
+  { t: 'DAo', name: 'Descending aorta', c: [0.35, 0.80, 0.45] },
+  { t: 'PA', name: 'Pulmonary artery', c: [0.35, 0.80, 0.45] },
+  { t: 'IVC', name: 'Inferior vena cava', c: [0.58, 0.74, 0.98] },
+  { t: '', name: 'Other vessel', c: [0.35, 0.80, 0.45] }
+];
+function akCss(k) { var c = AK[k].c; return 'rgb(' + Math.round(c[0] * 255) + ',' + Math.round(c[1] * 255) + ',' + Math.round(c[2] * 255) + ')'; }
+var AK_GLSL = 'vec3 chamber(float l){ if (l < 0.5) return vec3(0.0); ' + AK.slice(1).map(function (k, i) { return 'if (l < ' + (i + 1.5).toFixed(1) + ') return vec3(' + k.c.map(function (v) { return v.toFixed(3); }).join(', ') + ');'; }).join(' ') + ' return vec3(1.0); }';
+var SUB = null, SUBPTS = null, AK_SEED = { 5: [64, 70, 83], 7: [73, 85, 88], 8: [43, 68, 4] };   // voxel inside the aorta, the pulmonary artery and the IVC
+function segD2(p, a, b) { var ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], ap = [p[0] - a[0], p[1] - a[1], p[2] - a[2]], L = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2], u = L ? Math.max(0, Math.min(1, (ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / L)) : 0, d0 = ap[0] - ab[0] * u, d1 = ap[1] - ab[1] * u, d2 = ap[2] - ab[2] * u; return d0 * d0 + d1 * d1 + d2 * d2; }
+function lineD2(p, pts) { var best = 1e9; for (var i = 0; i < pts.length - 1; i++) best = Math.min(best, segD2(p, pts[i], pts[i + 1])); return best; }
+function subLabels() {
+  if (SUB) return SUB;
+  var i, q, a0, a1, a2, sub8 = new Uint8Array(LAB);
+  for (i = 0; i < FR; i++) if (sub8[i] === 5) sub8[i] = 9;
+  [5, 7, 8].forEach(function (k) {                                       // flood fill (6-connected) from the seed through vessel voxels
+    var s = AK_SEED[k], q0 = s[0] * VS + s[1] * NV + s[2], stack = [q0];
+    if (sub8[q0] !== 9) return; sub8[q0] = k;
+    function visit(j) { if (sub8[j] === 9) { sub8[j] = k; stack.push(j); } }
+    while (stack.length) {
+      q = stack.pop(); a0 = (q / VS) | 0; a1 = ((q - a0 * VS) / NV) | 0; a2 = q - a0 * VS - a1 * NV;
+      if (a0 > 0) visit(q - VS); if (a0 < NV - 1) visit(q + VS); if (a1 > 0) visit(q - NV); if (a1 < NV - 1) visit(q + NV); if (a2 > 0) visit(q - 1); if (a2 < NV - 1) visit(q + 1);
+    }
+  });
+  var asc = [AK_SEED[5]].concat(LINES_V.AAo);
+  for (i = 0; i < FR; i++) if (sub8[i] === 5) { a0 = (i / VS) | 0; a1 = ((i - a0 * VS) / NV) | 0; a2 = i - a0 * VS - a1 * NV; var p = [a0, a1, a2]; if (lineD2(p, LINES_V.DAo) < lineD2(p, asc)) sub8[i] = 6; }
+  /* the data label for the LV runs on through the aortic valve: a narrow core of the root, up to ~14 mm above the valve, is labelled LV.
+     Above the valve plane it is aorta, so it is coloured and named as aorta here (the image itself is not changed). */
+  var AXn = nrm(sub(LINES.AAo[0], LM.AV));
+  for (i = 0; i < FR; i++) if (sub8[i] === 4) { a0 = (i / VS) | 0; a1 = ((i - a0 * VS) / NV) | 0; a2 = i - a0 * VS - a1 * NV;
+    var dv = sub(a2w([a0, a1, a2]), LM.AV), dd = dot(dv, AXn); if (dd > 0 && dd < 25) { var rv = sub(dv, mul(AXn, dd)); if (dot(rv, rv) < 256) sub8[i] = 5; } }
+  SUB = sub8; return SUB;
+}
+/* centres of every second voxel (2.6 mm grid) of each named region in the heart's own frame (toLocal), for the names on the cut */
+function subPoints() {
+  if (SUBPTS) return SUBPTS;
+  var s = subLabels(), k, a0, a1, a2, P = [];
+  for (a0 = 0; a0 < NV; a0 += 2) for (a1 = 0; a1 < NV; a1 += 2) for (a2 = 0; a2 < NV; a2 += 2) { k = s[a0 * VS + a1 * NV + a2]; if (k && k <= 8) { (P[k] = P[k] || []).push((a0 - MID) * VOX, (a2 - 75) * VOX, (a1 - 75) * VOX); } }
+  SUBPTS = []; for (k = 0; k < 9; k++) SUBPTS.push(k ? new Float32Array(P[k] || []) : null);
+  return SUBPTS;
+}
+/* where each region crosses the scan plane (O, N in the heart frame): the in-plane voxel nearest the region's in-plane centroid, or null */
+function cutCentres(O, N) {
+  var P = subPoints(), out = [], k, i, a, d, n, sx, sy, sz, idx;
+  for (k = 1; k <= 8; k++) {
+    a = P[k]; n = 0; sx = sy = sz = 0; idx = [];
+    for (i = 0; i < a.length; i += 3) { d = (a[i] - O[0]) * N[0] + (a[i + 1] - O[1]) * N[1] + (a[i + 2] - O[2]) * N[2]; if (d > -1.35 && d < 1.35) { sx += a[i]; sy += a[i + 1]; sz += a[i + 2]; n++; idx.push(i); } }
+    if (n < 10) { out[k] = null; continue; }                         // fewer than 10 samples on a 2.6 mm grid (under ~70 mm2 on the cut): colour only
+    sx /= n; sy /= n; sz /= n; var best = 1e18, bi = idx[0];
+    for (i = 0; i < idx.length; i++) { var j = idx[i], e = (a[j] - sx) * (a[j] - sx) + (a[j + 1] - sy) * (a[j + 1] - sy) + (a[j + 2] - sz) * (a[j + 2] - sz); if (e < best) { best = e; bi = j; } }
+    out[k] = [a[bi], a[bi + 1], a[bi + 2]]; out[k].n = n;
+  }
+  return out;
+}
+/* name tags for the cut: one sprite per region, drawn over the cut face */
+function tagSprite(TH, k) {
+  var t = AK[k].t, cv = document.createElement('canvas'), x = cv.getContext('2d'), fs = 34, w;
+  x.font = '700 ' + fs + 'px "Figtree", system-ui, sans-serif'; w = Math.ceil(x.measureText(t).width) + 34; cv.width = w; cv.height = 52;
+  x.font = '700 ' + fs + 'px "Figtree", system-ui, sans-serif';
+  x.fillStyle = 'rgba(13,12,13,0.82)'; x.strokeStyle = akCss(k); x.lineWidth = 4;
+  x.beginPath(); if (x.roundRect) x.roundRect(2, 2, w - 4, 48, 12); else x.rect(2, 2, w - 4, 48); x.fill(); x.stroke();
+  x.fillStyle = '#FFFFFF'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(t, w / 2, 27);
+  var tex = new TH.CanvasTexture(cv); tex.colorSpace = TH.SRGBColorSpace || tex.colorSpace;
+  var sp = new TH.Sprite(new TH.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true }));
+  var h = 9.5; sp.scale.set(h * w / 52, h, 1); sp.renderOrder = 20; sp.visible = false; return sp;
+}
+
+var TAGS = { sp: null, key: '' };
+function cutTags(api) {                          // names on the cut-away: recomputed only when the plane moves or a switch changes
+  if (!TAGS.sp || !h3) return false; var st = api.st, ps = api.pose, on = !!(st.cut && st.labels && AN.cham && ps), k;
+  var key = on ? [ps.O, ps.N].map(function (v) { return v.map(function (x) { return x.toFixed(2); }).join(','); }).join('|') : 'off';
+  if (key === TAGS.key) return false; TAGS.key = key;
+  var C = on ? cutCentres(toLocal(ps.O), dirLocal(ps.N)) : [], nb = dirLocal(ps.n), ub = dirLocal(ps.u), done = [];
+  for (k = 1; k <= 8; k++) if (C[k]) {             // keep names apart: a name within 11 mm (depth) and 18 mm (across) of an earlier one moves along the beam
+    var n0 = C[k].n, moved = false;
+    for (var r = 0; r < 4; r++) done.forEach(function (q) { var d = [C[k][0] - q[0], C[k][1] - q[1], C[k][2] - q[2]], dn = dot(d, nb), du = dot(d, ub), o = 11 - Math.abs(dn); if (Math.abs(du) < 18 && o > 0) { C[k] = add(C[k], mul(nb, (dn >= 0 ? 1 : -1) * o)); moved = true; } });
+    if (moved && n0 < 27) { C[k] = null; continue; }    // a small region (under ~180 mm2) crowded by a neighbour's name: colour only
+    done.push(C[k]);
+  }
+  for (k = 1; k <= 8; k++) { var c = C[k], sp = TAGS.sp[k]; sp.visible = !!c; if (c) sp.position.set(c[0], c[1], c[2]); }
+  return true;
+}
+
 /* ---------------- 3D scene: skin, sternum and ribs, and the beating heart as a ray-marched volume */
 var h3 = null;
 function toLocal(p) { var zq = p[2] - ZH; return [p[0], cP * p[1] + sP * zq, -sP * p[1] + cP * zq]; }
@@ -369,7 +473,10 @@ function scene(c) {
   var SZ = NV * VOX, CX = (75 - MID) * VOX;
   var tex = new TH.Data3DTexture(vol.subarray(ED * FR, (ED + 1) * FR), NV, NV, NV);
   tex.format = TH.RedFormat; tex.type = TH.UnsignedByteType; tex.minFilter = tex.magFilter = TH.LinearFilter; tex.unpackAlignment = 1; tex.needsUpdate = true;
+  var labT = new TH.Data3DTexture(subLabels(), NV, NV, NV);          // split blood-pool labels: nearest, never blended across a boundary
+  labT.format = TH.RedFormat; labT.type = TH.UnsignedByteType; labT.minFilter = labT.magFilter = TH.NearestFilter; labT.unpackAlignment = 1; labT.needsUpdate = true;
   var U = {
+    uLab: { value: labT }, uCham: { value: 1 },
     uVol: { value: tex }, uIso: { value: 0.13 }, uCam: { value: new TH.Vector3() }, uMVP: { value: new TH.Matrix4() },
     uO: { value: new TH.Vector3() }, uN: { value: new TH.Vector3(0, 0, 1) }, uU: { value: new TH.Vector3(1, 0, 0) }, uB: { value: new TH.Vector3(0, 1, 0) },
     uCut: { value: 0 }, uCutSign: { value: 1 }, uShow: { value: 1 }, uDepth: { value: 160 }, uHalf: { value: 0.7 },
@@ -380,19 +487,23 @@ function scene(c) {
     vertexShader: 'varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: [
       'precision highp float; precision highp sampler3D;',
-      'varying vec3 vPos; uniform sampler3D uVol; uniform mat4 uMVP; uniform vec3 uCam, uO, uN, uU, uB, uBmin, uBmax;',
-      'uniform float uIso, uCut, uCutSign, uShow, uDepth, uHalf, uCx, uSz;',
+      'varying vec3 vPos; uniform sampler3D uVol, uLab; uniform mat4 uMVP; uniform vec3 uCam, uO, uN, uU, uB, uBmin, uBmax;',
+      'uniform float uIso, uCut, uCutSign, uShow, uDepth, uHalf, uCx, uSz, uCham;', AK_GLSL,
       'float S(vec3 p){ return texture(uVol, vec3(p.y, p.z, p.x - uCx) / uSz + 0.5033).r; }',
+      'float Lb(vec3 p){ return texture(uLab, vec3(p.y, p.z, p.x - uCx) / uSz + 0.5033).r * 255.0; }',
       'bool clipd(vec3 p){ return uCut > 0.5 && dot(p - uO, uN) * uCutSign > 0.0; }',
       'bool inSec(vec3 p){ vec3 d = p - uO; float x = dot(d, uU), y = dot(d, uB); return y > 0.0 && length(vec2(x, y)) < uDepth && abs(atan(x, y)) < uHalf; }',
       'void main(){',
       '  vec3 ro = uCam, rd = normalize(vPos - ro), inv = 1.0 / rd, t0 = (uBmin - ro) * inv, t1 = (uBmax - ro) * inv, tn = min(t0, t1), tf = max(t0, t1);',
       '  float a = max(max(max(tn.x, tn.y), tn.z), 0.0), b = min(min(tf.x, tf.y), tf.z); if (a >= b) discard;',
-      '  float dt = 0.7, t = a; bool prevC = false, hit = false, cutFace = false; vec3 p;',
-      '  for (int i = 0; i < 520; i++) { if (t > b) break; p = ro + rd * t; bool c = clipd(p); if (!c && S(p) > uIso) { hit = true; cutFace = prevC; break; } prevC = c; t += dt; }',
+      '  float dt = 0.7, t = a, lab = 0.0; bool prevC = false, hit = false, cutFace = false, chamberFace = false; vec3 p;',
+      '  for (int i = 0; i < 520; i++) { if (t > b) break; p = ro + rd * t; bool c = clipd(p);',
+      '    if (!c && prevC && uCham > 0.5) { lab = Lb(p); if (lab > 0.5 && lab < 9.5 && S(p) < uIso) { hit = true; chamberFace = true; break; } }',
+      '    if (!c && S(p) > uIso) { hit = true; cutFace = prevC; break; } prevC = c; t += dt; }',
       '  if (!hit) discard;',
       '  vec3 col, n;',
-      '  if (cutFace) { n = uN * uCutSign; float v = S(p); col = mix(vec3(0.62, 0.36, 0.32), vec3(0.93, 0.78, 0.72), smoothstep(0.1, 0.7, v)); if (uShow > 0.5 && inSec(p)) col = mix(col, vec3(0.47, 0.82, 0.77), 0.5); }',
+      '  if (chamberFace) { n = uN * uCutSign; col = chamber(lab) * 0.85; }',
+      '  else if (cutFace) { n = uN * uCutSign; float v = S(p); col = mix(vec3(0.62, 0.36, 0.32), vec3(0.93, 0.78, 0.72), smoothstep(0.1, 0.7, v)); if (uShow > 0.5 && inSec(p)) col = mix(col, vec3(0.47, 0.82, 0.77), 0.5); }',
       '  else { float lo = t - dt, hi = t; for (int k = 0; k < 5; k++) { float mm = 0.5 * (lo + hi); if (S(ro + rd * mm) > uIso) hi = mm; else lo = mm; } p = ro + rd * hi;',
       '    float e = 1.2; vec3 g = vec3(S(p + vec3(e, 0, 0)) - S(p - vec3(e, 0, 0)), S(p + vec3(0, e, 0)) - S(p - vec3(0, e, 0)), S(p + vec3(0, 0, e)) - S(p - vec3(0, 0, e)));',
       '    n = length(g) > 1e-5 ? -normalize(g) : -rd; col = vec3(0.70, 0.33, 0.27); if (uShow > 0.5 && abs(dot(p - uO, uN)) < 1.4 && inSec(p)) col = vec3(0.47, 0.82, 0.77); }',
@@ -411,9 +522,12 @@ function scene(c) {
     inv.copy(mesh.matrixWorld).invert(); cl.copy(cam.position).applyMatrix4(inv); U.uCam.value.copy(cl);
     U.uMVP.value.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).multiply(mesh.matrixWorld);
     U.uCutSign.value = cl.sub(U.uO.value).dot(U.uN.value) > 0 ? 1 : -1;
+    if (TAGS.sp) { var f = Math.abs(cl.dot(U.uN.value)) / (cl.length() || 1), op = Math.max(0, Math.min(1, (f - 0.22) / 0.25)); for (var kk = 1; kk <= 8; kk++) TAGS.sp[kk].material.opacity = op; }   // names fade out when the cut is seen edge-on
   };
   c.add(mesh);
-  h3 = { tex: tex, U: U, f: ED };
+  var tagG = new TH.Group(); tagG.matrixAutoUpdate = false; tagG.matrix.copy(mesh.matrix); tagG.matrixWorldNeedsUpdate = true; c.add(tagG);
+  TAGS.sp = []; for (k = 1; k <= 8; k++) { TAGS.sp[k] = tagSprite(TH, k); tagG.add(TAGS.sp[k]); } TAGS.key = ''; TAGS.TH = TH; TAGS.root = c.root;
+  h3 = { tex: tex, U: U, f: ED, lab: labT };
   return { skin: o.skin, anatomy: function (on) { o.ribs.forEach(function (m) { m.visible = !on; }); } };
 }
 
@@ -436,7 +550,8 @@ function frame(S, t, api) {
   var U = h3.U, ps = api.pose, st = api.st, ch = false;
   if (f !== h3.f) { h3.f = f; h3.tex.image.data = vol.subarray(f * FR, (f + 1) * FR); h3.tex.needsUpdate = true; ch = true; }
   if (ps) { var O = toLocal(ps.O), N = dirLocal(ps.N), u = dirLocal(ps.u), n = dirLocal(ps.n); U.uO.value.set(O[0], O[1], O[2]); U.uN.value.set(N[0], N[1], N[2]); U.uU.value.set(u[0], u[1], u[2]); U.uB.value.set(n[0], n[1], n[2]); }
-  U.uCut.value = st.cut ? 1 : 0; U.uShow.value = st.fan ? 1 : 0; U.uDepth.value = st.depth * 10; U.uHalf.value = 40 * D2R * st.sector / 100;
+  U.uCut.value = st.cut ? 1 : 0; U.uShow.value = st.fan ? 1 : 0; U.uDepth.value = st.depth * 10; U.uHalf.value = 40 * D2R * st.sector / 100; U.uCham.value = AN.cham ? 1 : 0;
+  if (cutTags(api)) ch = true;
   if (ch) api.redraw();
 }
 
@@ -476,6 +591,7 @@ function postPolar(o) {
   var g = o.st.gain; if (g > 1.3) { var add = (g - 1.3) * 0.085, pol = o.pol, spk = o.spk, n = o.NL * o.NS, ids = o.ids;
     for (var k = 0; k < n; k++) if (ids[k]) pol[k] += add * spk[k]; }
   if (MM.on) mmSample(o);
+  anCapture(o);
 }
 
 /* ---------------- M-mode: one scan line, sampled every rendered frame onto a strip that sweeps at a fixed speed.
@@ -535,9 +651,116 @@ function mmSetup() {
   setInterval(function () { if (MM.on && MM.pts.length < 2) mmReadout(); }, 700);
 }
 
+/* ---------------- clip recording (Session 4 checklist step 8; 1 Nov 2026). The Clip key records the next three beats,
+   starting on an R wave (five in atrial fibrillation, "longer in AF" as the Bench teaches), and replays them in a loop
+   that pauses and scrolls frame by frame. Frames are kept as small JPEGs; only the clip being viewed is decoded.
+   With Reduce Motion on, a finished clip waits for a tap on Play. */
+var CL = { rec: false, need: 3, b0: null, start: null, frames: [], times: [], t0: 0, last: 0, clips: [], cur: -1, bmps: null, play: false, fi: 0, pt0: 0, raf: 0 };
+var CL_MAX = 6, CL_W = 360, CL_FPS = 24;
+function clReduced() { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } }
+function clViewName() {
+  var id = sim && sim.st && sim.st.view, v = null; (sim.cfg.views || []).forEach(function (x) { if (x.id === id) v = x; });
+  var n = v ? (v.short || v.name || id) : 'Clip', m = String(n).match(/\(([^)]+)\)\s*$/); return m ? m[1] : n;
+}
+function clSay(t) { if (CL.st) CL.st.textContent = t; }
+function clStart() {
+  if (CL.rec) return;
+  if (sim.st.frozen) { clSay('Unfreeze first: a clip records the moving heart.'); return; }
+  if (!sim.st.playing) { clSay('Turn Motion on first (Display and measure): the heart is paused, as it is at start with Reduce Motion.'); return; }
+  CL.need = sim.S && sim.S.af ? 5 : 3; CL.rec = true; CL.b0 = Math.floor(PH.beats); CL.start = null; CL.frames = []; CL.times = []; CL.t0 = performance.now(); CL.last = 0;
+  CL.btn.setAttribute('aria-pressed', 'true'); CL.wrap.hidden = false; clSay('Waiting for the next beat…');
+  requestAnimationFrame(clTick);
+}
+function clTick(now) {
+  if (!CL.rec) return;
+  if (now - CL.t0 > 20000 || sim.st.frozen || !sim.st.playing) { clStop(true); return; }
+  var b = PH.beats;
+  if (CL.start === null && Math.floor(b) > CL.b0) { CL.start = Math.floor(b); CL.t0 = now; }
+  if (CL.start !== null) {
+    if (now - CL.last >= 1000 / CL_FPS - 2) { CL.last = now; clGrab(now - CL.t0); }
+    var k = Math.min(CL.need, Math.floor(b - CL.start) + 1);
+    if (b >= CL.start + CL.need) { clStop(false); return; }
+    clSay('Recording beat ' + k + ' of ' + CL.need + '…');
+  }
+  requestAnimationFrame(clTick);
+}
+function clGrab(t) {
+  var bm = document.getElementById('pb-bm'); if (!bm) return;
+  if (!CL.scr) { CL.scr = document.createElement('canvas'); CL.scr.width = CL_W; CL.scr.height = Math.round(CL_W * bm.height / bm.width); CL.sx = CL.scr.getContext('2d'); }
+  CL.sx.drawImage(bm, 0, 0, CL.scr.width, CL.scr.height);
+  var i = CL.frames.length; CL.frames.push(null); CL.times.push(t);
+  CL.scr.toBlob(function (bl) { CL.frames[i] = bl; }, 'image/jpeg', 0.82);
+}
+function clStop(aborted) {
+  CL.rec = false; CL.btn.setAttribute('aria-pressed', 'false');
+  if (aborted || CL.frames.length < 4) { clSay(aborted ? 'Recording stopped: the heart was frozen or paused.' : 'Too short to keep.'); clShelf(); return; }
+  var frames = CL.frames, times = CL.times, dur = times[times.length - 1] + 1000 / CL_FPS;
+  var clip = { name: clViewName(), beats: CL.need, dur: dur, frames: frames, times: times, af: !!(sim.S && sim.S.af), hr: HR };
+  var wait = function () { if (frames.some(function (f) { return !f; })) { setTimeout(wait, 30); return; }
+    CL.clips.push(clip); if (CL.clips.length > CL_MAX) CL.clips.shift();
+    clSay('Saved: ' + clip.name + ', ' + clip.beats + ' beats, ' + (dur / 1000).toFixed(1) + ' s' + (clip.af ? ' (atrial fibrillation)' : '') + '.');
+    clOpen(CL.clips.length - 1, !clReduced()); };
+  wait();
+}
+function clShelf() {
+  CL.shelf.innerHTML = '';
+  CL.clips.forEach(function (c, i) {
+    var b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', i === CL.cur ? 'true' : 'false');
+    b.textContent = (i + 1) + '. ' + c.name + ' · ' + c.beats + ' beats'; b.addEventListener('click', function () { clOpen(i, false); }); CL.shelf.appendChild(b);
+  });
+  CL.view.hidden = CL.cur < 0;
+}
+function clOpen(i, autoplay) {
+  var c = CL.clips[i]; if (!c) return; clPause();
+  if (CL.bmps) CL.bmps.forEach(function (x) { if (x && x.close) x.close(); }); CL.bmps = null; CL.cur = i; CL.fi = 0; clShelf();
+  if (CL.pcv.width !== CL.scr.width) { CL.pcv.width = CL.scr.width; CL.pcv.height = CL.scr.height; }
+  CL.rng.max = String(c.frames.length - 1); CL.rng.value = '0';
+  Promise.all(c.frames.map(function (f) { return createImageBitmap(f); })).then(function (bm) {
+    if (CL.cur !== i) { bm.forEach(function (x) { x.close && x.close(); }); return; }
+    CL.bmps = bm; clDraw(0); if (autoplay) clPlay();
+  }).catch(function () { clSay('This browser could not replay the clip.'); });
+}
+function clDraw(k) {
+  var c = CL.clips[CL.cur]; if (!c || !CL.bmps) return; k = Math.max(0, Math.min(c.frames.length - 1, k)); CL.fi = k;
+  CL.pcx.drawImage(CL.bmps[k], 0, 0); CL.rng.value = String(k);
+  CL.fr.textContent = 'Frame ' + (k + 1) + '/' + c.frames.length + ' · ' + (c.times[k] / 1000).toFixed(2) + ' s';
+}
+function clLoop(now) {
+  if (!CL.play) return; var c = CL.clips[CL.cur]; if (!c || !CL.bmps || CL.view.hidden) { clPause(); return; }
+  var t = (now - CL.pt0) % c.dur, k = 0; while (k < c.times.length - 1 && c.times[k + 1] <= t) k++;
+  if (k !== CL.fi) clDraw(k); CL.raf = requestAnimationFrame(clLoop);
+}
+function clPlay() { var c = CL.clips[CL.cur]; if (!c || !CL.bmps) return; CL.play = true; CL.pb.textContent = 'Pause'; CL.pb.setAttribute('aria-pressed', 'true'); CL.pt0 = performance.now() - c.times[CL.fi]; CL.raf = requestAnimationFrame(clLoop); }
+function clPause() { CL.play = false; if (CL.raf) cancelAnimationFrame(CL.raf); CL.raf = 0; if (CL.pb) { CL.pb.textContent = 'Play'; CL.pb.setAttribute('aria-pressed', 'false'); } }
+function clipSetup() {
+  var bm = document.getElementById('pb-bm'); if (!bm) return;
+  var wrap = document.createElement('div'); wrap.id = 'cp-clip'; wrap.hidden = true;
+  wrap.innerHTML = '<p class="cl-st" aria-live="polite"></p><div class="cl-shelf" role="group" aria-label="Recorded clips"></div>' +
+    '<div class="cl-view" hidden><canvas role="img" aria-label="Recorded clip replay"></canvas><div class="cl-ctl">' +
+    '<button type="button" class="cl-play" aria-pressed="false">Play</button><input type="range" min="0" max="0" step="1" value="0" aria-label="Scroll through the clip frame by frame">' +
+    '<span class="cl-fr"></span><button type="button" class="cl-del">Delete</button></div></div>';
+  var after = document.getElementById('cp-mm') || bm; after.parentNode.insertBefore(wrap, after.nextSibling);
+  CL.wrap = wrap; CL.st = wrap.querySelector('.cl-st'); CL.shelf = wrap.querySelector('.cl-shelf'); CL.view = wrap.querySelector('.cl-view');
+  CL.pcv = wrap.querySelector('canvas'); CL.pcx = CL.pcv.getContext('2d'); CL.pb = wrap.querySelector('.cl-play'); CL.rng = wrap.querySelector('input'); CL.fr = wrap.querySelector('.cl-fr');
+  CL.scr = document.createElement('canvas'); CL.scr.width = CL_W; CL.scr.height = Math.round(CL_W * bm.height / bm.width); CL.sx = CL.scr.getContext('2d');
+  CL.pb.addEventListener('click', function () { if (CL.play) clPause(); else clPlay(); });
+  CL.rng.addEventListener('input', function () { clPause(); clDraw(+CL.rng.value); });
+  wrap.querySelector('.cl-del').addEventListener('click', function () {
+    if (CL.cur < 0) return; clPause(); if (CL.bmps) CL.bmps.forEach(function (x) { x.close && x.close(); }); CL.bmps = null;
+    CL.clips.splice(CL.cur, 1); CL.cur = -1; clShelf(); clSay(CL.clips.length ? 'Clip deleted. Pick another clip to replay.' : 'Clip deleted.');
+    if (!CL.clips.length) wrap.hidden = true;
+  });
+  var b = document.createElement('button'); b.type = 'button'; b.id = 'cp-clipb'; b.className = 'pbc-key'; b.textContent = 'Clip';
+  b.title = 'Record the next three beats (five in atrial fibrillation)'; b.setAttribute('aria-pressed', 'false'); CL.btn = b;
+  var grp = document.querySelector('.pb-img .pbc-cl-frz') || document.querySelector('.pb-img .pb-tb'); if (grp) grp.appendChild(b);
+  b.addEventListener('click', clStart);
+  sim.clip = CL;                                                                            // for tests and the console
+}
+
 /* ---------------- ECG strip on the image */
 function ecgWave(ph, af, x) { var g = function (c, w, a) { var d = ((ph - c + 1.5) % 1) - 0.5; return a * Math.exp(-d * d / (2 * w * w)); }; return g(0, 0.012, 1) + g(-0.035, 0.01, -0.18) + g(0.035, 0.012, -0.25) + g(0.33, 0.05, 0.28) + (af ? 0.05 * Math.sin(x * 0.9) + 0.03 * Math.sin(x * 2.3) : g(0.84, 0.03, 0.13)); }
 function overlay(bx, o) {
+  anDraw(o);
   if (MM.on) mmOverlay(bx, o);
   var x0 = 272, x1 = o.EW - 34, yb = o.EH - 14, amp = 15, beats = 2, ph = PH.ph, af = !!(sim && sim.S && sim.S.af);
   bx.strokeStyle = '#78D2C4'; bx.lineWidth = 1.3; bx.beginPath();
@@ -548,6 +771,189 @@ function overlay(bx, o) {
   bx.stroke();
   var xc = x0 + (ph + 1) / beats * (x1 - x0); bx.fillStyle = '#E0A458'; bx.fillRect(xc - 1, yb - amp - 4, 2, amp + 8);
   if (o.st.labels && HR !== 70) { bx.fillStyle = '#E0A458'; bx.font = '700 11px "Figtree", Verdana, sans-serif'; bx.textAlign = 'left'; bx.fillText(HR + ' bpm', x0, yb - amp - 8); }
+}
+
+/* ---------------- anatomy strip beside the B-mode (2026-10-30): the same sector, pixel for pixel, coloured by what the simulator sampled there.
+   The engine samples one tissue per point along every scan line to build the image (o.ids in postPolar); this map is that sampling, so it
+   follows the probe, the depth, the beat and the finding shown. Blood is coloured by the key above; vessel blood, and LV blood within 40 mm
+   of the aortic valve, are named by looking the sampled point up in the split labels (through the same warp tissueAt uses). Hidden in "Spot the finding" until the finding is named. */
+var TCOL = {}, TGRP = {}, GCOL = {};
+(function () {
+  var c = { SKIN: '#D9B8A0', FAT: '#E6D7AE', MUSC: '#9C5A50', BONE: '#EDE6D2', MYO: '#B8706A', PERI: '#F4E6DE', MED: '#C6B395', LUNG: '#8C969C',
+    LIVER: '#8A5A3E', GAS: '#5B6064', DISC: '#CFC7B4', CART: '#BFD3D0', FLUID: '#F2C14E', CALC: '#FFFFFF' };
+  var g = { SKIN: 'Chest wall', FAT: 'Chest wall', MUSC: 'Chest wall', BONE: 'Bone (rib, sternum, spine)', MYO: 'Myocardium', PERI: 'Pericardium', MED: 'Mediastinum',
+    LUNG: 'Lung', LIVER: 'Liver', GAS: 'Stomach gas', DISC: 'Bone (rib, sternum, spine)', CART: 'Costal cartilage', FLUID: 'Fluid', CALC: 'Calcium' };
+  Object.keys(c).forEach(function (k) { if (T[k] != null) { TCOL[T[k]] = c[k]; TGRP[T[k]] = g[k]; if (!GCOL[g[k]] || k === 'MUSC' || k === 'BONE') GCOL[g[k]] = c[k]; } });
+})();
+var BCLS = {}; BCLS[T.RAB] = 1; BCLS[T.LAB] = 2; BCLS[T.RVB] = 3; BCLS[T.LVB] = 4;
+var AN = { on: true, cham: true, cv: null, cx: null, off: null, ox: null, img: null, ids: null, NL: 0, NS: 0, fresh: false, key: '', lut: null, la: null, lb: null, cls: null, W: 256, H: 224, last: 0, vis: true, keyHtml: '', hid: null };
+function hexRGB(h) { var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+var TRGB = {}; Object.keys(TCOL).forEach(function (k) { TRGB[k] = hexRGB(TCOL[k]); });
+var BLACK = [0, 0, 0], KRGB = AK.map(function (k) { return k ? k.c.map(function (v) { return Math.round(v * 255); }) : null; });
+function anCapture(o) {
+  if (!AN.cv || !AN.vis) return; var n = o.NL * o.NS;
+  if (!AN.ids || AN.ids.length !== n) AN.ids = new Uint8Array(n);
+  AN.ids.set(o.ids); AN.NL = o.NL; AN.NS = o.NS; AN.fresh = true;
+}
+function warpFree(S) { return !(S.swing || S.tamp || S.rvDil !== 1 || S.lvCav !== 1 || S.lvWall !== 1 || S.ivcDil !== 1 || S.press > 0.15); }
+function anVessel(a, b, S, near, flat) {           // the region at plane point (a, b), looked up in the split labels (vessels; blood near the aortic valve)
+  var ps = sim.pose, x = ps.O[0] + ps.u[0] * a + ps.n[0] * b, y = ps.O[1] + ps.u[1] * a + ps.n[1] * b, z = ps.O[2] + ps.u[2] * a + ps.n[2] * b;
+  if (near) { var ex = x - LM.AV[0], ey = y - LM.AV[1], ez = z - LM.AV[2]; if (ex * ex + ey * ey + ez * ez > 1600) return near; }
+  if (!flat) { var W = warp(x, y, z, S); x = W[0]; y = W[1]; z = W[2]; }
+  var zq = z - ZH, yv = cP * y + sP * zq, zv = -sP * y + cP * zq, a0 = Math.round(x / VOX + MID), a1 = Math.round(zv / VOX + 75), a2 = Math.round(yv / VOX + 75);
+  if (a0 < 0 || a1 < 0 || a2 < 0 || a0 >= NV || a1 >= NV || a2 >= NV) return near || 9;
+  var s = SUB[a0 * VS + a1 * NV + a2]; return near ? (s === 5 ? 5 : near) : s >= 5 ? s : 9;
+}
+function anLUT(o) {
+  var W = AN.W, H = AN.H, p0 = o.plane2img(0, 0), pa = o.plane2img(1, 0), pb = o.plane2img(0, 1), sa = pa[0] - p0[0], sb = pb[1] - p0[1];
+  var key = [W, H, AN.NL, AN.NS, p0[0].toFixed(3), p0[1].toFixed(3), sa.toFixed(5), sb.toFixed(5), o.st.sector, o.st.depth, o.st.probe].join('|');
+  if (key === AN.key) return; AN.key = key;
+  var N = W * H, ps = sim.pose, k, sx, sy; AN.lut = new Int32Array(N); AN.la = new Float32Array(N); AN.lb = new Float32Array(N); AN.cls = new Uint8Array(N);
+  for (sy = 0; sy < H; sy++) for (sx = 0; sx < W; sx++) {
+    k = sy * W + sx; var px = (sx + 0.5) * o.EW / W, py = (sy + 0.5) * o.EH / H, a = (px - p0[0]) / sa, b = (py - p0[1]) / sb;
+    var q = sim.world2img(add(add(ps.O, mul(ps.u, a)), mul(ps.n, b)));
+    AN.la[k] = a; AN.lb[k] = b; AN.lut[k] = q.ok ? Math.round(q.c * (AN.NL - 1)) * AN.NS + Math.round(q.r * (AN.NS - 1)) : -1;
+  }
+}
+function anHidden(st) { return st.mode === 'spot' && st.spot && !st.spot.answered; }
+/* the map is drawn in its own animation frame, after the image, so its cost never counts against the image's quality budget */
+function anDraw(o) {
+  if (!AN.cv) return;
+  AN.o = { st: o.st, S: o.S, plane2img: o.plane2img, EW: o.EW, EH: o.EH };
+  if (!AN.raf) AN.raf = requestAnimationFrame(function () { AN.raf = 0; anPaint(AN.o); });
+}
+function anPaint(o) {
+  var st = o.st, hide = anHidden(st), now = performance.now();
+  if (hide !== AN.hid) { AN.hid = hide; AN.fresh = true; AN.last = 0; }        // the veil goes up at once, even off screen
+  if ((!AN.vis && !(hide && AN.fresh)) || (!AN.ids && !hide)) return;
+  if (!AN.fresh || now - AN.last < 45) return; AN.fresh = false; AN.last = now;
+  var cx = AN.cx, CW = AN.cv.width, CH = AN.cv.height;
+  if (hide) {
+    cx.fillStyle = '#0D0C0D'; cx.fillRect(0, 0, CW, CH); cx.fillStyle = '#A89B9C'; cx.font = '600 22px "Figtree", system-ui, sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillText('Hidden until you name the finding', CW / 2, CH / 2);
+    AN.tags = null; AN.keyT = 0; anKey([], true); return;
+  }
+  anLUT(o); subLabels();
+  var W = AN.W, H = AN.H, N = W * H, d = AN.img.data, ids = AN.ids, lut = AN.lut, cls = AN.cls, S = o.S, k, id, rgb, kk, ps = sim.pose;
+  /* vessel and aortic-root lookups are cached per pixel while the probe and the finding stand still (every map for a swinging or collapsing heart) */
+  var flat = warpFree(S), vkey = [ps.O, ps.n, ps.u].map(function (v) { return v.map(function (x) { return x.toFixed(2); }).join(','); }).join('|') + '|' + [st.variant, S.lvCav, S.lvWall, S.rvDil, S.ivcDil, S.press].join(',') + '|' + AN.key + (S.swing || S.tamp ? '|' + now : '');
+  if (!AN.vc || AN.vc.length !== N) AN.vc = new Uint8Array(N);
+  if (vkey !== AN.vkey) { AN.vkey = vkey; AN.vc.fill(0); }
+  var vc = AN.vc, cnt = new Float64Array(64), nk = new Int32Array(10), tot = 0;
+  for (k = 0; k < N; k++) {
+    var j = lut[k], p = k * 4; cls[k] = 0;
+    if (j < 0) { d[p + 3] = 0; continue; }
+    id = ids[j]; tot++; cnt[id]++;
+    kk = BCLS[id] || 0;
+    if (id === T.VES || kk === 4) { if (!vc[k]) vc[k] = id === T.VES ? anVessel(AN.la[k], AN.lb[k], S, 0, flat) : anVessel(AN.la[k], AN.lb[k], S, 4, flat); kk = vc[k]; }
+    if (kk) { rgb = KRGB[kk]; cls[k] = kk; nk[kk]++; } else rgb = TRGB[id] || BLACK;
+    d[p] = rgb[0]; d[p + 1] = rgb[1]; d[p + 2] = rgb[2]; d[p + 3] = 255;
+  }
+  AN.ox.putImageData(AN.img, 0, 0);
+  cx.fillStyle = '#0D0C0D'; cx.fillRect(0, 0, CW, CH);
+  cx.imageSmoothingEnabled = true; cx.drawImage(AN.off, 0, 0, CW, CH);
+  var fx = CW / W, fy = CH / H, minN = Math.max(30, tot * 0.004), seen = [];
+  for (kk = 1; kk <= 9; kk++) if (nk[kk] >= minN) seen.push(kk);
+  if (!AN.tags || now - AN.tagT > 140) { AN.tagT = now; AN.tags = anNames(cls, nk, minN, W, H, N, fx, fy); }
+  cx.font = '700 21px "Figtree", system-ui, sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  AN.tags.forEach(function (tg) {
+    cx.fillStyle = 'rgba(13,12,13,.78)'; cx.beginPath(); if (cx.roundRect) cx.roundRect(tg.X - tg.w / 2, tg.Y - 14, tg.w, 28, 8); else cx.rect(tg.X - tg.w / 2, tg.Y - 14, tg.w, 28); cx.fill();
+    cx.fillStyle = '#FFFFFF'; cx.fillText(tg.t, tg.X, tg.Y + 1);
+  });
+  /* key: regions and tissues present (over 0.4% of the sector) */
+  if (!AN.keyT || now - AN.keyT > 500) {                             // the key is text on the page: refreshed twice a second, and only when it changes
+    AN.keyT = now; var groups = {}; Object.keys(TGRP).forEach(function (tid) { if (cnt[tid] > tot * 0.004) groups[TGRP[tid]] = GCOL[TGRP[tid]]; });
+    anKey(seen, false, groups);
+  }
+  var dtm = performance.now() - now; AN.ms = AN.msN > 1 ? AN.ms * 0.9 + 0.1 * dtm : dtm; AN.msN = (AN.msN || 0) + 1;   // cost of one map (ms), for the console (the first, which splits the labels, is not counted)
+}
+/* names: at the most interior pixel of each region (distance to its edge, two-pass 3-4 chamfer), nudged toward its centroid; refreshed ~7 times a second */
+function anNames(cls, nk, minN, W, H, N, fx, fy) {
+  var dt = AN.dt && AN.dt.length === N ? AN.dt : (AN.dt = new Uint16Array(N)), x, y, k, kk, v, sx = new Float64Array(10), sy = new Float64Array(10);
+  for (k = 0; k < N; k++) { kk = cls[k]; if (kk && kk <= 8) { sx[kk] += k % W; sy[kk] += (k / W) | 0; } }
+  for (kk = 1; kk <= 8; kk++) if (nk[kk]) { sx[kk] /= nk[kk]; sy[kk] /= nk[kk]; }
+  for (y = 0; y < H; y++) for (x = 0; x < W; x++) { k = y * W + x; kk = cls[k]; if (!kk || kk > 8) { dt[k] = 0; continue; }
+    v = x > 0 && cls[k - 1] === kk ? dt[k - 1] + 3 : 3;
+    if (y > 0) { if (cls[k - W] === kk) v = Math.min(v, dt[k - W] + 3); else v = Math.min(v, 3);
+      if (x > 0) v = Math.min(v, cls[k - W - 1] === kk ? dt[k - W - 1] + 4 : 4); if (x < W - 1) v = Math.min(v, cls[k - W + 1] === kk ? dt[k - W + 1] + 4 : 4); } else v = Math.min(v, 3);
+    dt[k] = v; }
+  for (y = H - 1; y >= 0; y--) for (x = W - 1; x >= 0; x--) { k = y * W + x; kk = cls[k]; if (!kk || kk > 8) continue;
+    v = dt[k]; v = Math.min(v, x < W - 1 && cls[k + 1] === kk ? dt[k + 1] + 3 : 3);
+    if (y < H - 1) { v = Math.min(v, cls[k + W] === kk ? dt[k + W] + 3 : 3);
+      if (x < W - 1) v = Math.min(v, cls[k + W + 1] === kk ? dt[k + W + 1] + 4 : 4); if (x > 0) v = Math.min(v, cls[k + W - 1] === kk ? dt[k + W - 1] + 4 : 4); } else v = Math.min(v, 3);
+    dt[k] = v; }
+  var bx = new Float64Array(10).fill(-1e18), bi = new Int32Array(10).fill(-1), bd = new Int32Array(10), tags = [];
+  for (k = 0; k < N; k++) { kk = cls[k]; if (!kk || kk > 8) continue; var ex = k % W - sx[kk], ey = ((k / W) | 0) - sy[kk], e = dt[k] / 3 - 0.12 * Math.sqrt(ex * ex + ey * ey); if (e > bx[kk]) { bx[kk] = e; bi[kk] = k; bd[kk] = dt[k]; } }
+  AN.cx.font = '700 21px "Figtree", system-ui, sans-serif';
+  for (kk = 1; kk <= 8; kk++) {
+    if (nk[kk] < minN || bi[kk] < 0 || bd[kk] < 9) continue;          // too small, or too thin to hold a name (under ~5 mm across): colour and key only
+    var t = AK[kk].t, tg = { t: t, X: (bi[kk] % W + 0.5) * fx, Y: (((bi[kk] / W) | 0) + 0.5) * fy, w: AN.cx.measureText(t).width + 16 }, Y0 = tg.Y;
+    for (var r = 0; r < 4; r++) tags.forEach(function (o2) { var ox = (tg.w + o2.w) / 2 + 2 - Math.abs(tg.X - o2.X), oy = 30 - Math.abs(tg.Y - o2.Y); if (ox > 0 && oy > 0) tg.Y += (tg.Y >= o2.Y ? 1 : -1) * oy; });   // keep names apart
+    var kq = Math.min(N - 1, Math.max(0, Math.floor(tg.Y / fy) * W + (bi[kk] % W)));
+    if (tg.Y !== Y0 && cls[kq] !== kk) continue;                        // pushed off its own region by a neighbour's name: colour and key only
+    tags.push(tg);
+  }
+  return tags;
+}
+function anKey(seen, hide, groups) {
+  var h = hide ? '' : seen.map(function (k) { return '<li><i style="background:' + akCss(k) + '"></i>' + AK[k].name + '</li>'; }).join('') +
+    Object.keys(groups || {}).map(function (g) { return '<li class="t"><i style="background:' + groups[g] + '"></i>' + g + '</li>'; }).join('');
+  if (h === AN.keyHtml) return; AN.keyHtml = h;
+  var el = document.getElementById('cp-an-key'); if (el) el.innerHTML = h;
+  AN.cv.setAttribute('aria-label', hide ? 'Anatomy map hidden until you name the finding.' : 'Anatomy in this plane: ' + seen.map(function (k) { return AK[k].name.toLowerCase(); }).concat(Object.keys(groups || {}).map(function (g) { return g.toLowerCase(); })).join(', ') + '.');
+}
+/* "Face the cut": opens the cut-away and turns the 3D view square to the scan plane, from the side that shows it as the screen does
+   (index side of the image on the same side; the engine's camera keeps the world vertical, so depth runs roughly downward) */
+function faceCut() {
+  if (!sim || !sim.pose || !TAGS.root || !sim.cam) return;
+  if (!sim.st.cut) { var bc = document.getElementById('pb-cut'); if (bc) bc.click(); }
+  if (!AN.cham) { AN.cham = true; document.getElementById('cp-an-cham').checked = true; TAGS.key = ''; }
+  var TH = TAGS.TH, ps = sim.pose, cam = sim.cam, mw = TAGS.root.matrixWorld, c = add(ps.O, mul(ps.n, sim.st.depth * 10 * 0.42));
+  var tgt = new TH.Vector3(c[0], c[1], c[2]).applyMatrix4(mw), N = new TH.Vector3(ps.N[0], ps.N[1], ps.N[2]).transformDirection(mw);
+  var q0 = sim.world2img(ps.O), q1 = sim.world2img(add(ps.O, mul(ps.u, 10))), MSg = q1.px >= q0.px ? 1 : -1;   // +1: the index (u) side is on the right of the image
+  var U = new TH.Vector3(ps.u[0], ps.u[1], ps.u[2]).transformDirection(mw).multiplyScalar(MSg), right = new TH.Vector3(N.z, 0, -N.x);   // camera right for a camera on the +N side
+  if (right.dot(U) < 0) N.negate();
+  var to = { theta: Math.atan2(N.x, N.z), phi: Math.asin(Math.max(-0.95, Math.min(0.95, N.y))), dist: 560 }, fr = { theta: cam.theta, phi: cam.phi, dist: cam.dist, target: cam.target.clone() };
+  var dth = to.theta - fr.theta; dth -= 2 * Math.PI * Math.round(dth / (2 * Math.PI));
+  var t0 = performance.now(), dur = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450;
+  (function step() {
+    var k = dur ? Math.min(1, (performance.now() - t0) / dur) : 1, e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    cam.theta = fr.theta + dth * e; cam.phi = fr.phi + (to.phi - fr.phi) * e; cam.dist = fr.dist + (to.dist - fr.dist) * e; cam.target.lerpVectors(fr.target, tgt, e); sim.redraw();
+    if (k < 1) requestAnimationFrame(step);
+  })();
+}
+function anatSetup() {
+  var pane = document.querySelector('.pb-3d'); if (!pane) return;
+  var box = document.createElement('div'); box.className = 'cp-an'; box.id = 'cp-an';
+  box.innerHTML = '<div class="pb-ph"><h2>Anatomy in this plane</h2><span>what each part of the image is · modelled</span></div>' +
+    '<div class="cp-an-row"><div class="cp-an-scr"><canvas id="cp-an-cv" width="512" height="448" role="img" aria-label="Anatomy in this plane."></canvas></div>' +
+    '<div class="cp-an-side"><ul class="cp-an-key" id="cp-an-key"></ul>' +
+    '<label class="cp-an-chk"><input type="checkbox" id="cp-an-cham" checked><span>Colour and name the chambers on the 3D <b>Cut-away</b></span></label>' +
+    '<div class="pb-tb cp-an-tb"><button type="button" id="cp-an-face">Face the cut</button></div>' +
+    '<p class="cp-an-n">Same sector as the image, coloured by tissue. It follows the finding shown; the 3D heart stays normal. “Face the cut” shows the cut the way the screen does.</p></div></div>';
+  pane.appendChild(box);
+  AN.cv = document.getElementById('cp-an-cv'); AN.cx = AN.cv.getContext('2d');
+  AN.off = document.createElement('canvas'); AN.off.width = AN.W; AN.off.height = AN.H; AN.ox = AN.off.getContext('2d'); AN.img = AN.ox.createImageData(AN.W, AN.H);
+  AN.cx.fillStyle = '#0D0C0D'; AN.cx.fillRect(0, 0, AN.cv.width, AN.cv.height);
+  document.getElementById('cp-an-cham').addEventListener('change', function (e) { AN.cham = e.target.checked; TAGS.key = ''; sim.redraw(); });
+  document.getElementById('cp-an-face').addEventListener('click', faceCut);
+  sim.anat = { AN: AN, TAGS: TAGS, sub: subLabels, centres: cutCentres };   // for tests and the console
+  if (window.IntersectionObserver) new IntersectionObserver(function (es) { AN.vis = es[es.length - 1].isIntersecting; if (AN.vis) { AN.fresh = true; sim.redraw(); } }).observe(AN.cv);
+  var css = document.createElement('style'); css.textContent =
+    '.cp-an{padding:4px 12px 12px}.pb.pb-hw .cp-an{padding:6px 2px 4px}' +
+    '.cp-an .pb-ph{padding:6px 4px 10px}' +
+    '.cp-an-row{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;align-items:start}' +
+    '.cp-an-scr{border-radius:13px;overflow:hidden;background:var(--hw-glass,#0D0C0D);border:1px solid var(--hw-edge-deep,#2C2729);box-shadow:var(--hw-sh-glass,none);padding:6px}' +
+    '.cp-an-scr canvas{display:block;width:100%;height:auto;aspect-ratio:512/448;border-radius:4px;background:#0D0C0D}' +
+    '.cp-an-side{display:flex;flex-direction:column;gap:10px;min-width:0;color:var(--hw-ink,var(--scr-ink));font-size:13.5px;line-height:1.35}' +
+    '.cp-an-key{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:5px 12px}' +
+    '.cp-an-key li{display:flex;align-items:center;gap:6px;min-width:0}.cp-an-key li.t{opacity:.82}' +
+    '.cp-an-key i{flex:0 0 auto;width:12px;height:12px;border-radius:3px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}' +
+    '.cp-an-chk{display:flex;gap:9px;align-items:flex-start;min-height:44px;cursor:pointer;font-weight:600}' +
+    '.cp-an-chk input{width:20px;height:20px;margin:1px 0 0;flex:0 0 auto;accent-color:var(--hw-lit,var(--teal))}' +
+    '.cp-an .cp-an-tb{padding:0;border:0;background:transparent}' +
+    '.cp-an-n{margin:0;color:var(--hw-label,var(--scr-muted));font-size:12.5px}';
+  document.head.appendChild(css);
 }
 
 /* ---------------- labels */
@@ -575,7 +981,7 @@ var VIEWS = [
       { pt: nearOnLine(LINES.DAo, true), within: 9, label: 'Descending aorta in view', hint: 'Set the depth to include the descending aorta behind the left atrium.' }],
     check: function (c) { var a = lvTilt(c.pose); return [{ ok: Math.abs(a) <= 36, label: 'Ventricle lies across the screen', hint: 'The ventricle is tilted. Rock the probe, or move up or down one interspace.' }]; },
     how: 'Window 1: left sternal border, 3rd–4th interspace. Indicator to the patient’s right shoulder. Start at about 16 cm, then reduce until the heart fills two-thirds of the sector.',
-    see: ['Left ventricle across the screen, not tilted or foreshortened.', 'Mitral and aortic valves in view.', 'Descending aorta behind the left atrium ⚑: the landmark for pericardial against pleural fluid.', 'Answers: pericardial fluid, LV size and squeeze, septal thickness, gross valve motion.'],
+    see: ['Left ventricle across the screen, not tilted or foreshortened.', 'Mitral and aortic valves in view.', 'Descending aorta behind the left atrium: the landmark for pericardial against pleural fluid (Gajjar 2026 · PMID 41835345).', 'Answers: pericardial fluid, LV size and squeeze, septal thickness, gross valve motion.'],
     tip: '<b>Characteristic error.</b> An interspace too high or too low, or a tilted ventricle. It foreshortens the cavity and makes any linear measurement unreliable. Change the interspace.' },
   { id: 'psax-pm', group: 'Parasternal', name: 'Short axis, mid-papillary (PSAX)', short: 'PSAX', probe: 'ph', depth: 15, pose: POSE['psax-pm'], tol: { slide: 12 },
     require: [{ ids: [T.LVB], min: 0.03, label: 'Left ventricle' }, { ids: [T.RVB], min: 0.01, label: 'Right ventricle' }, { pt: mid(LM.MV, LM.APEX), within: 9, label: 'Cut at the papillary level', hint: 'Tilt toward the apex or the base until the plane crosses the middle of the ventricle.' }],
@@ -584,7 +990,7 @@ var VIEWS = [
     tip: '<b>Characteristic error.</b> An oval cavity: the plane is oblique. It fabricates a regional wall-motion abnormality or a false D-shape.' },
   { id: 'a4c', group: 'Apical', name: 'Apical four-chamber (A4C)', short: 'A4C', probe: 'ph', depth: 18, pose: POSE.a4c, tol: { slide: 14 },
     require: FOUR.concat([{ pt: LM.APEX, within: 10, label: 'True apex in the plane', hint: 'The ventricle looks short and round: the probe is too high. Slide lower and more lateral.' }]),
-    how: 'Left lateral decubitus. Probe at the apex ⚑, indicator to the patient’s left. Bring all four chambers into view with the septum upright in the middle ⚑.',
+    how: 'Left lateral decubitus. Probe on the palpated apical impulse, indicator to the patient’s left (about 4–5 o’clock). Bring all four chambers into view with the LV apex at the top and centre of the sector (Mitchell 2019 · PMID 30282592).',
     see: ['The LEFT ventricle forms the apex, and it looks long, not round.', 'Right and left ventricles side by side at full length.', 'Answers: RV against LV size. TAPSE, if measured, is taken here.'],
     tip: '<b>Characteristic error.</b> Probe too high: the apex looks rounded and thick. It fabricates a dilated, globular LV and a false RV enlargement. Slide lower and more lateral.' },
   { id: 'a5c', group: 'Apical', name: 'Apical five-chamber (A5C)', short: 'A5C', probe: 'ph', depth: 18, pose: POSE.a5c, tol: { slide: 14 },
@@ -594,7 +1000,7 @@ var VIEWS = [
     tip: '<b>Characteristic error.</b> Treating it as a Doppler view. That is Session 6 material and needs Session 6 competence.' },
   { id: 'subx', group: 'Subxiphoid', name: 'Subxiphoid four-chamber', short: 'Subxiphoid', probe: 'ph', depth: 19, pose: POSE.subx, tol: { slide: 14 },
     require: FOUR.concat([{ ids: [T.LIVER], min: 0.03, label: 'Liver as the window', hint: 'Keep the probe flat under the xiphoid so the beam passes through the liver.' }]),
-    how: 'Supine, knees flexed. Probe flat under the xiphoid, indicator to the patient’s left, aimed toward the left shoulder ⚑. Use the liver as the window and increase depth.',
+    how: 'Supine, knees flexed. Probe flat under the xiphoid, indicator to the patient’s left, aimed toward the left shoulder (Mitchell 2019). Use the liver as the window and increase depth.',
     see: ['All four chambers through the liver.', 'Right ventricular free wall nearest the probe: where diastolic collapse is judged.', 'Answers: pericardial effusion. Then rotate to the IVC long axis (Session 5).'],
     tip: '<b>Characteristic errors.</b> Angling too steeply: you look below the heart. Giving up before flexing the knees: a missed effusion gets reported as “no effusion”.' },
   { id: 'ivc', group: 'Subxiphoid', name: 'Subxiphoid IVC, long axis', short: 'IVC', probe: 'ph', depth: 16, pose: POSE.ivc, find: false,
@@ -651,20 +1057,20 @@ var VARIANTS = [
   { id: 'eff-small', name: 'Small pericardial effusion', answer: 'Pericardial effusion without collapse', group: 'Pericardium', view: 'plax', views: ['plax', 'subx', 'a4c', 'psax-pm'],
     apply: function (S) { S.eff = 11; S.effPost = 0.85; },
     teach: ex('A thin echo-free space behind the posterior LV wall, largest in systole, with almost nothing anteriorly.',
-      ['PLAX first: the space lies between the posterior wall and the bright pericardium, and it passes in front of the descending aorta. Then subxiphoid: fluid between the liver and the RV free wall.', 'Measure the largest pocket at end-diastole (on the R wave, or when the cavity is largest). Under 10 mm is small, 10–20 mm moderate, over 20 mm large (ASE 2013, Klein · PMID 23998693).', 'Say where it is: posterior only, or circumferential.'],
-      ['Epicardial fat sits anteriorly, is grey rather than black, moves with the heart and has no posterior component.', 'Fluid seen only in systole is physiological.', 'Over-gain fills a small effusion with echo and it disappears.'],
+      ['PLAX first: the space lies between the posterior wall and the bright pericardium, and it passes in front of the descending aorta. Then subxiphoid: fluid between the liver and the RV free wall.', 'Measure the largest pocket at end-diastole (on the R wave, or when the cavity is largest). Under 10 mm is mild (small), 10–20 mm moderate, over 20 mm large, as the maximal end-diastolic space (ESC 2025 Table 10, Schulz-Menger · PMID 40878297).', 'Say where it is: posterior only, or circumferential.'],
+      ['Epicardial fat sits mostly anteriorly (over the RV), is grey and heterogeneous rather than black, moves with the heart and usually has no posterior component (Gajjar 2026).', 'Fluid seen only in systole is physiological.', 'Over-gain fills a small effusion with echo and it disappears.'],
       'A small effusion answers the Session 4 question. In a dialysis patient note it, correlate with uraemic symptoms and compare with the last study; it does not need Doppler.') },
   { id: 'eff-large', name: 'Large circumferential effusion, no collapse', answer: 'Pericardial effusion without collapse', group: 'Pericardium', view: 'subx', views: ['subx', 'plax', 'a4c', 'psax-pm', 'ivc'],
     apply: function (S) { S.eff = 24; S.effPost = 0.35; S.ivcDil = 1.15; },
     teach: ex('An echo-free rim all round the heart, over 20 mm at its widest, with the chambers still filling normally.',
-      ['Subxiphoid with the knees flexed is the window: the fluid is between the liver and the RV free wall. Confirm in PLAX (fluid anterior to the descending aorta) and A4C.', 'Size it at end-diastole at the widest point; over 20 mm is large (Klein 2013 · PMID 23998693). Then look for what makes it dangerous, not just how big it is: RA and RV collapse, a plethoric IVC.', 'Freeze and step frame by frame through diastole on the RV free wall before you call it “no collapse”.'],
-      ['Size alone does not predict tamponade: tolerance depends more on how fast fluid accumulates than on its volume, so a slow effusion can grow large before pressure rises, while a small rapid post-procedure bleed can cause tamponade (ESC 2015, Adler · PMID 26320112).', 'A left pleural effusion lies behind the descending aorta and is the commonest mimic.'],
+      ['Subxiphoid with the knees flexed is the window: the fluid is between the liver and the RV free wall. Confirm in PLAX (fluid anterior to the descending aorta) and A4C.', 'Size it at end-diastole at the widest point; over 20 mm is large (ESC 2025 Table 10 · PMID 40878297). Then look for what makes it dangerous, not just how big it is: RA and RV collapse, a plethoric IVC.', 'Freeze and step frame by frame through diastole on the RV free wall before you call it “no collapse”.'],
+      ['Size alone does not predict tamponade: tolerance depends more on how fast fluid accumulates than on its volume, so a slow effusion can grow large before pressure rises, while a small rapid post-procedure bleed can cause tamponade: 200–300 mL can tamponade when it collects quickly, and 1–2 L may not when it collects slowly (ESC 2025, Schulz-Menger · PMID 40878297).', 'A left pleural effusion lies behind the descending aorta and is the commonest mimic.'],
       'Report the size, the distribution and the absence of collapse, and the IVC. Large effusions are followed with comprehensive echo; in ESKD, intensification of dialysis is the usual first step for a uraemic effusion.') },
   { id: 'tamp', name: 'Tamponade: effusion with chamber collapse', answer: 'Tamponade physiology (effusion with chamber collapse)', group: 'Pericardium', view: 'subx', views: ['subx', 'a4c', 'plax', 'psax-pm', 'ivc'],
     apply: function (S) { S.eff = 26; S.effPost = 0.3; S.tamp = true; S.swing = 1; S.ivcDil = 1.45; S.hr = Math.max(S.hr, 115); },
-    teach: ex('A large effusion, a heart swinging inside it at a fast rate, the RV free wall buckling inward in early diastole and the RA wall in late diastole, and a fat IVC that does not collapse.',
-      ['Tamponade is a clinical diagnosis (hypotension, tachycardia, raised JVP); the scan supports it. Scan while someone checks the blood pressure.', 'Subxiphoid and A4C: freeze and scroll. RV free-wall inversion in early diastole (when the mitral valve is open) is highly specific (Gajjar 2026 · PMID 41835345); RA inversion lasting more than a third of the cycle is nearly 100% sensitive and specific (Klein 2013 · PMID 23998693).', 'IVC: dilated with under 50% inspiratory collapse is present in nearly every tamponade and its absence argues against it (Klein 2013). This simulator shows the size; measure on the Session 5 simulator.', 'Respiratory variation of mitral inflow over 30% and tricuspid over 60% needs pulsed Doppler (Session 6); it is not modelled here.'],
-      ['Collapse is phase-specific. RV collapse in systole is normal contraction; the finding is diastolic inversion.', 'Positive-pressure ventilation and raised right-sided pressures blunt collapse and IVC change; a loculated post-surgical collection can tamponade one chamber without a circumferential effusion.', 'Hypovolaemia (a post-dialysis patient) makes chambers collapse with a smaller effusion.'],
+    teach: ex('A large effusion, a heart swinging inside it at a fast rate, the RV free wall buckling inward in early diastole and the RA wall from late diastole into early systole, and a fat IVC that does not collapse.',
+      ['Tamponade is a clinical diagnosis (hypotension, tachycardia, raised JVP); the scan supports it. Scan while someone checks the blood pressure.', 'Subxiphoid and A4C: freeze and scroll. RV free-wall inversion in early diastole (when the mitral valve is open) is highly specific (Gajjar 2026 · PMID 41835345): sensitivity 48–100%, specificity 72–100% (ESC 2025 Table 17 · PMID 40878297). RA inversion lasting more than a third of the cycle (ratio over 0.34) has sensitivity over 90% and specificity 100%; any RA diastolic collapse has sensitivity 50–100% and specificity only 33–100% (ESC 2025 Table 17).', 'IVC plethora (over 20 mm with under 50% respiratory change, with hepatic-vein dilatation) has sensitivity 97% but specificity 40% (ESC 2025 Table 17). Its absence argues against tamponade; its presence proves little in an overloaded dialysis patient. This simulator shows the size; measure on the Session 5 simulator.', 'Respiratory variation of mitral inflow (ESC 2025 Table 17: E >25–30%) and tricuspid inflow (E >40–60%) needs pulsed Doppler (Session 6); it is not modelled here.'],
+      ['Collapse is phase-specific. RV collapse in systole is normal contraction; the finding is diastolic inversion.', 'Chronically raised right-sided pressures (pulmonary hypertension, RV hypertrophy) can make collapse signs atypical or absent; volume overload, pulmonary hypertension and positive-pressure ventilation make IVC plethora non-specific (Gajjar 2026). A loculated post-surgical collection can tamponade one chamber without a circumferential effusion.', 'Hypovolaemia (a post-dialysis patient) can make chambers collapse with a smaller effusion and a cava that is not plethoric ⚑: physiological reasoning (low-pressure tamponade), not a finding from a dialysis study.'],
       'This is an escalation finding: say the words “pericardial effusion with echocardiographic signs of tamponade”, keep the probe on, and call for pericardiocentesis-capable help. Do not wait for pulsus paradoxus.') },
   { id: 'pleural', name: 'Left pleural effusion mimicking pericardial fluid', answer: 'Pleural effusion, not pericardial', group: 'Pericardium', view: 'plax', views: ['plax', 'psax-pm'],
     apply: function (S) { S.pleural = true; },
@@ -676,7 +1082,7 @@ var VARIANTS = [
   { id: 'dcm', name: 'Dilated LV with severely reduced systolic function', answer: 'Dilated LV with severely reduced systolic function', group: 'Ventricular function', view: 'plax', views: ['plax', 'psax-pm', 'a4c', 'a2c'],
     apply: function (S) { S.lvCav = 1.38; S.lvWall = 0.72; S.ef = 0.3; S.hr = Math.max(S.hr, 92); S.jets.push(jet(LM.MV, sub(LAC, LM.MV), T.LVB, T.LAB, 'sys', 380, 38, 2.5, 14, 8)); S.focus = { p: LM.MV }; },
     teach: ex('A large, round LV whose walls barely thicken, a wide mitral annulus with a central systolic jet into the LA on colour, and a fast rate.',
-      ['PLAX: the cavity is wide at end-diastole (normal LVIDd is 42–58 mm in men and 38–52 mm in women: Lang 2015 · PMID 25559473) and the anterior mitral leaflet opens far short of the septum. E-point septal separation over 7 mm had 100% sensitivity (8 of 8; 95% CI 62.9–100) but 52% specificity for EF ≤30% in one single-centre convenience sample admitted through the ED (McKaigney 2014 · PMID 24630604 ⚑): use it to rule out a severely reduced EF, not to measure one. EPSS is measured by M-mode through the mitral leaflet tips; this heart model has no leaflets, so practise it on real clips.', 'PSAX mid-papillary: watch the whole ring. Global hypokinesia thickens nowhere; a regional defect spares one wall.', 'A4C: estimate the EF by eye in categories. Normal 52–72% (men) and 54–74% (women); mildly reduced 41–51 / 41–53; moderately 30–40; severely under 30 (Lang 2015).', 'Then the consequences: LA size, functional MR on colour (recognition only), IVC and B-lines for congestion (Sessions 5 and 3).'],
+      ['PLAX: the cavity is wide at end-diastole (normal LVIDd is 42–58 mm in men and 38–52 mm in women: Lang 2015 · PMID 25559473) and the anterior mitral leaflet opens far short of the septum. E-point septal separation over 7 mm had 100% sensitivity (8 of 8; 95% CI 62.9–100) but 52% specificity for EF ≤30% in one single-centre convenience sample admitted through the ED (McKaigney 2014 · PMID 24630604, full text): use it to rule out a severely reduced EF, not to measure one. EPSS is measured by M-mode through the mitral leaflet tips; this heart model has no leaflets, so practise it on real clips.', 'PSAX mid-papillary: watch the whole ring. Global hypokinesia thickens nowhere; a regional defect spares one wall.', 'A4C: estimate the EF by eye in categories. Normal 52–72% (men) and 54–74% (women); mildly reduced 41–51 / 41–53; moderately 30–40; severely under 30 (Lang 2015).', 'Then the consequences: LA size, functional MR on colour (recognition only), IVC and B-lines for congestion (Sessions 5 and 3).'],
       ['Foreshortening makes a normal LV look round and globular: the apical error of this simulator.', 'Tachycardia and AF shorten filling; estimate over several beats.', 'A severely reduced EF in a dialysis patient changes the ultrafiltration plan more than any single number on the chart.'],
       'Focused POCUS gives the category, not the number. Formal EF (biplane Simpson), diastolic grading (Nagueh 2025 · PMID 40617625) and the MR grade need a comprehensive echo.') },
   { id: 'lvh', name: 'Concentric LVH with a small, vigorous cavity', answer: 'Concentric hypertrophy with a small, vigorous cavity', group: 'Ventricular function', view: 'plax', views: ['plax', 'psax-pm', 'a4c'],
@@ -688,26 +1094,26 @@ var VARIANTS = [
   { id: 'hyper', name: 'Small hyperdynamic LV, underfilled', answer: 'Small hyperdynamic LV (underfilled)', group: 'Ventricular function', view: 'psax-pm', views: ['psax-pm', 'plax', 'a4c', 'ivc'],
     apply: function (S) { S.lvCav = 0.62; S.lvWall = 1.0; S.ivcDil = 0.6; S.hr = Math.max(S.hr, 100); },
     teach: ex('Normal wall thickness, a small end-diastolic cavity, papillary muscles that touch in systole, and a slit-like IVC.',
-      ['PSAX mid-papillary: the ring obliterates (“kissing” papillary muscles). Check the wall thickness is normal, which separates underfilling from hypertrophy.', 'PLAX: a small LVIDd with normal walls and brisk motion.', 'IVC (Session 5): small and collapsing completely. This is the one setting where the IVC is unambiguous.'],
-      ['End-systolic obliteration alone is not hypovolaemia: a hypertrophied or vasodilated heart does it with a normal volume.', 'In a dialysis patient this picture at the end of a run means the dry weight target was overshot or the ultrafiltration rate was too fast.'],
+      ['PSAX mid-papillary: the ring obliterates (“kissing” papillary muscles). Check the wall thickness is normal, which separates underfilling from hypertrophy.', 'PLAX: a small LVIDd with normal walls and brisk motion.', 'IVC (Chapter 11): small and collapsing completely. A small, collapsed cava suggests a low right atrial pressure (ASE 2025, Mukherjee · PMID 40044341), provided the breath was quiet and the cut is centred.'],
+      ['End-systolic obliteration alone is not hypovolaemia: a hypertrophied or vasodilated heart does it with a normal volume.', 'In a dialysis patient this picture at the end of a run suggests, in context, that the dry weight target was overshot or the ultrafiltration rate was too fast.'],
       'A pattern to act on at the chairside: slow or stop ultrafiltration, reassess the target weight, and re-scan after the intervention rather than before it.') },
   { id: 'rvdil', name: 'Dilated RV with septal flattening', answer: 'Right ventricular dilation with septal flattening', group: 'Ventricular function', view: 'a4c', views: ['a4c', 'psax-pm', 'subx', 'plax', 'ivc'],
     apply: function (S) { S.rvDil = 1.45; S.ivcDil = 1.4; },
     teach: ex('In A4C the RV is as large as or larger than the LV and shares the apex; in PSAX the septum is flat and the LV is D-shaped; the IVC is plethoric.',
-      ['A4C: compare basal diameters at end-diastole. The RV is normally no more than two-thirds of the LV, and an RV larger than the LV is likely significantly enlarged (Rudski 2010 · PMID 20620859, qualitative); basal RV over 41 mm is enlarged (Lang 2015 · PMID 25559473).', 'PSAX mid-papillary: when does the septum flatten? In systole it is pressure overload (pulmonary hypertension, PE); in diastole it suggests volume overload (e.g. TR, atrial septal defect); a D-shaped septum is not diagnostic on its own (Rudski 2010).', 'RV function: TAPSE under 17 mm, fractional area change under 35% or S′ under 9.5 cm/s is abnormal (Lang 2015). TAPSE on the M-mode strip: press M, tap the lateral tricuspid annulus to put the line through it, freeze, and measure how far the annulus moves from peak to trough (simulator scale).', 'IVC and hepatic veins (Session 5, VExUS) read the venous side of the same problem.'],
-      ['A foreshortened or lateral A4C makes the RV look dilated: find the true apex first.', 'Acute RV strain with a hyperdynamic apex (McConnell sign) points to pulmonary embolism; a dilated RV with a thick free wall (over 5 mm) is chronic.', 'The dialysis patient with an arteriovenous fistula and a dilated RV may have high-output failure: ask about the fistula flow.'],
+      ['A4C: compare basal diameters at end-diastole. The RV should look no more than two-thirds the size of the LV, with the LV forming the apex (Mukherjee 2025 · PMID 40044341, qualitative; it replaces Rudski 2010). An RV basal diameter greater than the LV basal diameter counts as RV enlargement (Mukherjee 2025). Basal RV is normal under 4.1 cm (Mukherjee 2025 Table 1); Lang 2015 · PMID 25559473 calls over 41 mm dilated.', 'PSAX mid-papillary: when does the septum flatten? In systole it is pressure overload (pulmonary hypertension, PE); in diastole it suggests volume overload (e.g. TR, atrial septal defect); a D-shaped septum is not diagnostic on its own: systolic flattening also occurs with pulmonary stenosis or RVOT obstruction (Mukherjee 2025).', 'RV function: TAPSE under 17 mm, fractional area change under 35% or S′ under 9.5 cm/s is abnormal (Lang 2015). TAPSE on the M-mode strip: press M, tap the lateral tricuspid annulus to put the line through it, freeze, and measure how far the annulus moves from peak to trough (simulator scale).', 'IVC and hepatic veins (Session 5, VExUS) read the venous side of the same problem.'],
+      ['A foreshortened or lateral A4C makes the RV look dilated: find the true apex first.', 'Acute RV strain with a hyperdynamic apex (McConnell sign) points to pulmonary embolism; a dilated RV with a free wall 5 mm or thicker suggests a chronic process (normal under 5 mm, Mukherjee 2025), but wall thickening is non-specific.', 'The dialysis patient with an arteriovenous fistula and a dilated RV may have high-output failure: ask about the fistula flow.'],
       'Say dilated or not, apex-forming or not, septum flat in systole or diastole, and the IVC. Pressures (TR velocity) are Session 6 and comprehensive echo.') },
 
   { id: 'as', name: 'Calcific aortic stenosis', answer: 'Calcific aortic stenosis', group: 'Valves', view: 'plax', views: ['plax', 'psax-av', 'a5c', 'a3c'],
     apply: function (S) { S.calcAV = true; S.lvCav = 0.86; S.lvWall = 1.35; S.asJet = true; S.jets.push(jet(LM.AV, sub(LINES.AAo[2], LINES.AAo[0]), T.LVB, T.VES, 'sys', 400, 42, 4, 10, 10)); S.focus = { p: LINES.AAo[1] }; },
     teach: ex('Bright, shadowing calcium on the aortic leaflets that barely separate in systole, a thick-walled LV, and a mosaic systolic jet filling the aortic root on colour.',
       ['PLAX: leaflet thickness and excursion in systole, calcium with its shadow, post-stenotic dilatation of the ascending aorta, and the wall thickness it has produced. PSAX at the aortic valve: how many cusps move and how small the orifice looks.', 'A5C and A3C align the beam with the jet: colour shows aliasing in the LVOT and aorta in systole. Grading needs continuous-wave Doppler: severe is peak velocity ≥4 m/s, mean gradient ≥40 mmHg, valve area under 1.0 cm² (EACVI/ASE 2017, Baumgartner · PMID 28385280).', 'The 2D question for a focused study is “is there calcific valve disease, and is the ventricle paying for it?”, not the grade.'],
-      ['Aortic sclerosis (calcium, free motion, velocity under 2.5 m/s) is far commoner than stenosis and looks similar in 2D.', 'A low-flow state (the poor LV of the dialysis patient) gives a low gradient despite severe stenosis; gradient alone misleads (Baumgartner 2017).', 'Calcium at the annulus shadows the posterior structures: change the view rather than the gain.'],
+      ['Aortic sclerosis (calcium, free motion, peak velocity 2.5 m/s or less: Baumgartner 2017) is far commoner than stenosis and looks similar in 2D.', 'A low-flow state (the poor LV of the dialysis patient) gives a low gradient despite severe stenosis; gradient alone misleads (Baumgartner 2017).', 'Calcium at the annulus shadows the posterior structures: change the view rather than the gain.'],
       'Calcific aortic valve disease is common in long-term dialysis. Refer for comprehensive echo with Doppler grading; do not report a severity from colour.') },
   { id: 'mr', name: 'Mitral regurgitation', answer: 'Mitral regurgitation', group: 'Valves', view: 'a4c', views: ['a4c', 'plax', 'a3c', 'a2c'],
     apply: function (S) { S.jets.push(jet(LM.MV, add(sub(LAC, LM.MV), [0, 8, -10]), T.LVB, T.LAB, 'sys', 450, 46, 4, 19, 9)); S.focus = { p: LM.MV }; },
     teach: ex('In systole a mosaic jet crosses the closed mitral valve into the LA, with a small zone of flow convergence on the LV side; the 2D valve and chambers are normal in this archetype.',
-      ['A4C with the colour box over the mitral valve and LA, scale 50–60 cm/s: the jet appears in systole only. Confirm in a second view (PLAX or A3C) and describe its direction, central or wall-hugging.', 'Then 2D for the cause: leaflet prolapse or flail, calcium and restriction (annular calcification in CKD), a dilated annulus from a dilated LV.', 'Severity needs quantitation: vena contracta ≥7 mm, effective orifice ≥0.4 cm², regurgitant volume ≥60 mL for severe (ASE 2017, Zoghbi · PMID 28314623). Jet area alone is not a grade.'],
+      ['A4C with the colour box over the mitral valve and LA, scale (Nyquist) 50–70 cm/s (Zoghbi 2017): the jet appears in systole only. Confirm in a second view (PLAX or A3C) and describe its direction, central or wall-hugging.', 'Then 2D for the cause: leaflet prolapse or flail, calcium and restriction (annular calcification in CKD), a dilated annulus from a dilated LV.', 'Severity needs quantitation: vena contracta ≥7 mm, effective orifice ≥0.4 cm², regurgitant volume ≥60 mL for severe (ASE 2017, Zoghbi · PMID 28314623). Jet area alone is not a grade.'],
       ['An eccentric jet hugging the atrial wall looks small (the Coanda effect) and is underestimated; a central jet looks large.', 'Low colour gain hides a jet; high gain or a low Nyquist limit paints aliasing into normal inflow.', 'A trace of MR in systole is common and normal.'],
       'Recognition only in Session 4: “systolic regurgitant jet across the mitral valve, present in two views”. Quantitation and mechanism belong to Session 6 and comprehensive echo.') },
   { id: 'ar', name: 'Aortic regurgitation', answer: 'Aortic regurgitation', group: 'Valves', view: 'plax', views: ['plax', 'a5c', 'a3c'],
@@ -720,7 +1126,7 @@ var VARIANTS = [
     apply: function (S) { S.jets.push(jet(LM.TV, add(sub(RAC, LM.TV), [-6, 10, 0]), T.RVB, T.RAB, 'sys', 380, 42, 3, 16, 8)); S.rvDil = 1.2; S.ivcDil = 1.3; S.focus = { p: LM.TV }; },
     teach: ex('A systolic jet across the tricuspid valve into the RA, a mildly dilated RV and a plethoric IVC.',
       ['A4C with the colour box over the tricuspid valve and RA; the RV inflow view (from PLAX, angle toward the right hip) gives a second, often better-aligned look.', 'The jet velocity, by continuous-wave Doppler, estimates RV systolic pressure (4v² plus RA pressure); that is Session 6.', 'Severity: vena contracta ≥7 mm, effective orifice ≥0.4 cm², and systolic flow reversal in the hepatic veins are severe criteria (Zoghbi 2017 · PMID 28314623). Hepatic-vein systolic reversal is exactly the VExUS hepatic pattern of Session 5.'],
-      ['Functional TR follows RV dilation and pacing or dialysis-catheter leads; look at the RV and the lead before blaming the leaflets.', 'A trace of TR is normal and is what makes the pressure estimate possible.'],
+      ['Functional (secondary) TR follows RV dilation and dysfunction; TR from a pacing lead is classed as primary, iatrogenic (Zoghbi 2017 Table 12). Look at the RV and any lead before blaming the leaflets.', 'A trace of TR is normal and is what makes the pressure estimate possible.'],
       'Report the jet, the RV size and the IVC, and read them with the VExUS grade. Grading and pressure estimation are comprehensive-echo measurements.') },
   { id: 'mac', name: 'Mitral annular calcification', answer: 'Mitral annular calcification', group: 'Valves', view: 'plax', views: ['plax', 'a4c', 'psax-mv', 'a2c'],
     apply: function (S) { S.mac = true; },
@@ -815,16 +1221,15 @@ function isReview() {
 }
 var AUDIT_SRC = [
   ['Koratala 2024', '39502372', 'Held', 'Scope; IAPN basic and orientation views'],
-  ['Mitchell 2019', '30282592', '⚑ Not held', 'What a comprehensive study contains'],
+  ['Mitchell 2019', '30282592', 'Read 27 Oct (free ASE PDF)', 'What a comprehensive study contains; A4C and subxiphoid acquisition'],
   ['Neskovic 2018', '29529170', 'Held on the Bench; register says upload needed', 'Focused cardiac curriculum wording'],
   ['Argaiz 2021', '35369665', 'Held', 'Reading the heart with the IVC and lungs'],
-  ['Alerhand 2019', '30471929', '⚑ Not held', 'Tamponade signs (with Klein and Gajjar)'],
+  ['Alerhand 2019', '30471929', '⚑ Not held', 'Tamponade signs (with ESC 2025 and Gajjar)'],
   ['Kirkpatrick 2024', '39230540', 'Held', 'Report nomenclature and fields'],
   ['Lang 2015', '25559473', 'Held', 'LV, RV and wall normals; TAPSE under 17 mm'],
-  ['Rudski 2010', '20620859', 'Held on the Bench; register says upload needed', 'RV against LV size'],
-  ['Klein 2013', '23998693', 'Read 26 Oct (free ASE PDF)', 'Effusion size; RA collapse over a third of the cycle; IVC in tamponade'],
+  ['Mukherjee 2025 (replaces Rudski 2010)', '40044341', 'Read 27 Oct (free ASE PDF, corrected May 2025 version)', 'RV against LV size; septal flattening; RV wall thickness'],
+  ['ESC 2025 (Schulz-Menger)', '40878297', 'Held (library PDF)', 'Effusion size (Table 10); RA collapse over a third of the cycle and IVC plethora (Table 17); speed of accumulation; tamponade is a clinical diagnosis'],
   ['Gajjar 2026', '41835345', 'Held (open access)', 'RV early-diastolic collapse is highly specific'],
-  ['Adler 2015', '26320112', 'Held on the Bench; register says not open access', 'Tamponade is a clinical diagnosis; speed of accumulation'],
   ['Zoghbi 2017', '28314623', 'Read 26 Oct (free ASE PDF)', 'MR, TR and AR severity criteria'],
   ['Baumgartner 2017', '28385280', 'Read 26 Oct (free ASE PDF)', 'Severe aortic stenosis criteria'],
   ['Nagueh 2025', '40617625', 'Held', 'Diastolic grading is outside the focused study'],
@@ -841,19 +1246,20 @@ function auditCard() {
     '<li>Walls are drawn thick: do not read wall thickness off the image.</li>' +
     '<li>No valve leaflets: EPSS cannot be practised; valve findings are flow jets and calcium only.</li>' +
     '<li>22 frames per beat: the M-mode trace is stepped and timing is coarse.</li>' +
-    '<li>Every pathology is a warp of one normal heart (composite archetype); the 3D heart always shows the normal model.</li></ul>' +
+    '<li>Every pathology is a warp of one normal heart (composite archetype); the 3D heart always shows the normal model.</li>' +
+    '<li>Anatomy colours and names (the strip and the 3D cut-away) come from the model’s own blood-pool labels, fixed at one frame. The data labels a narrow core of the aortic root above the valve as LV; it is shown as aorta. Below the valve the outflow tract is LV, so a short-axis cut through the valve can show both. The other vessel names come from connected pieces of one vessel label.</li></ul>' +
     '<h3>Sources behind the numbers on this page</h3><p class="pb-muted">Every PMID checked against PubMed on 26 Oct 2026.</p>' +
     '<div class="au-tw"><table><thead><tr><th>Source</th><th>PMID</th><th>Full text</th><th>Used here for</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<h3>Corrected on 26 Oct</h3><ul>' +
-    '<li>“RV collapse is the specific sign” was cited to Klein 2013, which does not say it; now cited to Gajjar 2026, which does. Klein’s own figure kept: RA collapse over a third of the cycle is nearly 100% sensitive and specific.</li>' +
+    '<li>“RV collapse is the specific sign” was cited to Klein 2013, which does not say it; now cited to Gajjar 2026, which does. On 27 Oct every Klein 2013 and ESC 2015 citation on this page was replaced by ESC 2025 (Tables 10 and 17), the values the Bench chapter teaches.</li>' +
     '<li>Severe aortic stenosis area: “≤1.0 cm²” → “under 1.0 cm²” (Baumgartner 2017), in two places.</li>' +
     '<li>Aortic regurgitation jet width: “over 65%” → “65% or more” of the outflow tract (Zoghbi 2017).</li>' +
-    '<li>The IVC line in the tamponade checklist had no source; now Klein 2013 (over 90% of tamponade; not specific).</li>' +
+    '<li>The IVC line in the tamponade checklist had no source; now ESC 2025 Table 17 (>20 mm, <50% change: sensitivity 97%, specificity 40%).</li>' +
     '<li>Mitchell 2019 now carries its ⚑, as on the Bench. Klein, Zoghbi and Baumgartner added to the register.</li></ul>' +
     '<h3>Open questions</h3><ul>' +
-    '<li>⚑ means two things on this page: “unread or abstract-level source” (the Bench meaning) and, for McKaigney, “single emergency-department series”, although McKaigney is held. Keep both, or restate the McKaigney caveat in words?</li>' +
-    '<li>The ⚑ on three view-note lines (descending-aorta landmark, apex position, subxiphoid aim) marks standard technique with no paper behind it.</li>' +
-    '<li>The register still lists Rudski 2010, Neskovic 2018 and Adler 2015 as not held, while the Bench’s evidence list holds them.</li></ul>';
+    '<li>Resolved 27 Oct (auditor; revert if you prefer the old use): ⚑ now has only the Bench meaning, and the McKaigney single-series caveat is stated in words.</li>' +
+    '<li>Resolved 27 Oct: the three view-note lines that carried a technique ⚑ (descending-aorta landmark, apex position, subxiphoid aim) now cite Gajjar 2026 and Mitchell 2019, both read in full.</li>' +
+    '<li>The register still lists Rudski 2010 and Neskovic 2018 as not held, while the Bench’s evidence list holds them.</li></ul>';
   return d;
 }
 function reportCard() {
@@ -995,16 +1401,16 @@ function start() {
     probes: { ph: { type: 'sector', label: 'Phased array 1–5 MHz', fov: 80, depth: [8, 24], defDepth: 16 } },
     views: VIEWS, variants: VARIANTS, labels: LABELS, casesToComplete: 6, overlay: overlay, postPolar: postPolar,
     slideLabels: ['Slide along the body (head / feet)', 'Slide around the chest'],
-    notes: '<h3>Scope</h3><ul><li>Session 4 is two-dimensional and question-driven: pericardium, LV squeeze, RV size.</li><li>IAPN basic views: PLAX, PSAX, apical four- and five-chamber, subxiphoid, IVC.</li><li>“Orientation only” views are outside the Session 4 checklist.</li><li>A limited cardiac POCUS study. Not a comprehensive echocardiogram.</li></ul>' +
-      '<h3>Reading this simulator</h3><ul><li>The heart is a 3D model beating through one cycle. Chest wall, ribs, lungs and liver are modelled around it.</li><li>“Finding shown” lists acquisition errors (how a normal heart was scanned) and pathology archetypes (geometric and acoustic changes to the same normal model, with colour Doppler for the valve jets). The 3D heart on the right always shows the normal model.</li><li>Colour Doppler here is for recognition: jets appear on the far side of a closed valve in the right phase and alias at the Nyquist limit. Grading needs spectral Doppler and a comprehensive echo.</li><li>Scale is approximate and the walls are drawn thick: do not read chamber size or wall thickness off it.</li><li>Freeze and tap twice for a caliper.</li></ul>' +
-      '<p class="pb-muted">Wording follows Session 4 of the Bench. IAPN 2024 · PMID 39502372 · Mitchell 2019 · PMID 30282592 ⚑ · Neskovic 2018 · PMID 29529170 · Argaiz 2021 · PMID 35369665 · Alerhand 2019 · PMID 30471929 ⚑. Pathology reference values: Lang 2015 · PMID 25559473 · Rudski 2010 · PMID 20620859 · Klein 2013 · PMID 23998693 · Gajjar 2026 · PMID 41835345 · Adler 2015 · PMID 26320112 · Zoghbi 2017 · PMID 28314623 · Baumgartner 2017 · PMID 28385280 · Nagueh 2025 · PMID 40617625 · McKaigney 2014 · PMID 24630604 ⚑.</p><p class="pb-muted">⚑ = standard technique, or an abstract-level source, as flagged on the Bench.</p>',
-    footer: 'Session 4: focused cardiac ultrasound. 3D heart model from TTESim, used with permission. Read the heart with the IVC (Session 5) and the lungs (Session 3).'
+    notes: '<h3>Scope</h3><ul><li>Session 4 is two-dimensional and question-driven: pericardium, LV squeeze, RV size.</li><li>IAPN basic views: PLAX, PSAX, apical four- and five-chamber, subxiphoid, IVC.</li><li>“Orientation only” views are outside the Session 4 checklist.</li><li>A basic cardiac POCUS (FoCUS) study. Not a comprehensive echocardiogram.</li></ul>' +
+      '<h3>Reading this simulator</h3><ul><li>The heart is a 3D model beating through one cycle. Chest wall, ribs, lungs and liver are modelled around it.</li><li>“Finding shown” lists acquisition errors (how a normal heart was scanned) and pathology archetypes (geometric and acoustic changes to the same normal model, with colour Doppler for the valve jets). The 3D heart on the right always shows the normal model.</li><li>Colour Doppler here is for recognition: jets appear on the far side of a closed valve in the right phase and alias at the Nyquist limit. Grading needs spectral Doppler and a comprehensive echo.</li><li>Scale is approximate and the walls are drawn thick: do not read chamber size or wall thickness off it.</li><li>Freeze and tap twice for a caliper. Clip records the next three beats for replay.</li><li>“Anatomy in this plane” colours the image’s own sector by tissue; with Cut-away on, the 3D heart is coloured and named the same way.</li></ul>' +
+      '<p class="pb-muted">Wording follows Session 4 of the Bench. IAPN 2024 · PMID 39502372 · Mitchell 2019 · PMID 30282592 · Neskovic 2018 · PMID 29529170 · Argaiz 2021 · PMID 35369665 · Alerhand 2019 · PMID 30471929 ⚑. Pathology reference values: Lang 2015 · PMID 25559473 · Mukherjee 2025 · PMID 40044341 · Gajjar 2026 · PMID 41835345 · ESC 2025 (Schulz-Menger) · PMID 40878297 · Zoghbi 2017 · PMID 28314623 · Baumgartner 2017 · PMID 28385280 · Nagueh 2025 · PMID 40617625 · McKaigney 2014 · PMID 24630604.</p><p class="pb-muted">⚑ = an abstract-level or unread source, or an unsourced claim, as flagged on the Bench.</p>',
+    footer: 'Chapter 4: focused cardiac ultrasound. 3D heart model from TTESim, used with permission. Read the heart with the IVC (Chapter 11) and the lungs (Chapter 3).'
   });
   window.simCardiac = sim; window.sim = sim;
   var card = document.createElement('details'); card.className = 'pb-card'; card.id = 'cp-list';
   card.innerHTML = '<summary>Session 4 skills checklist: what this simulator practises</summary>' +
     '<h3>Practised here</h3><ul><li>Step 1, machine and preset: marker side, and the mirrored-image error.</li><li>Steps 3 to 6, acquisition: PLAX, PSAX, apical four-chamber, subxiphoid. Use “Find the view”.</li><li>Step 7, optimisation: depth, gain, far-field gain, sector width.</li></ul>' +
-    '<h3>Practised here since phase 3</h3><ul><li>Steps 10 to 13: effusion and its size, the pleural mimic, chamber collapse, tamponade physiology.</li><li>Step 14, visual LVEF categories, on the dilated and the hyperdynamic archetypes.</li><li>Step 16, RV against LV size, on the dilated RV.</li><li>Valve recognition (preview of Session 6): calcific AS, MR, AR, TR, annular calcification.</li><li>Step 17, TAPSE on the M-mode strip in A4C (press M; simulator scale).</li></ul><h3>Not simulated yet</h3><ul><li>Step 8, clip recording.</li><li>Step 15, EPSS: M-mode works, but this heart model has no mitral leaflets.</li><li>Spectral Doppler and respiratory variation.</li></ul>' +
+    '<h3>Practised here since phase 3</h3><ul><li>Steps 10 to 13: effusion and its size, the pleural mimic, chamber collapse, tamponade physiology.</li><li>Step 14, visual LVEF categories, on the dilated and the hyperdynamic archetypes.</li><li>Step 16, RV against LV size, on the dilated RV.</li><li>Valve recognition (preview of Session 6): calcific AS, MR, AR, TR, annular calcification.</li><li>Step 17, TAPSE on the M-mode strip in A4C (press M; simulator scale).</li><li>Step 8, clip recording: press Clip to record the next three beats (five in atrial fibrillation), then replay, pause and scroll it.</li></ul><h3>Not simulated yet</h3><ul><li>Step 15, EPSS: M-mode works, but this heart model has no mitral leaflets.</li><li>Spectral Doppler and respiratory variation.</li></ul>' +
     '<h3>Practised in the report panel</h3><ul><li>Steps 9, 19 and 20: adequacy statement (views obtained, limited or not, and image quality), the structured report, and escalation. “Check against the finding shown” compares your categories with the loaded archetype.</li></ul>' +
     '<h3>Bedside only</h3><ul><li>Step 2, patient positioning.</li><li>Step 18, scope discipline with a real patient in front of you.</li></ul>';
   var rc = document.createElement('div'); rc.className = 'pb-card'; rc.id = 'cp-real';
@@ -1022,30 +1428,30 @@ function start() {
     '<h3>Pericardial effusion and tamponade</h3><ol>' +
     '<li><b>Subxiphoid first</b>, supine, knees flexed: fluid between the liver and the RV free wall. If the window fails, PLAX.</li>' +
     '<li><b>PLAX</b>: find the descending aorta behind the LA. Pericardial fluid passes in front of it; pleural fluid lies behind it.</li>' +
-    '<li><b>Size</b> the largest pocket at end-diastole: under 10 mm small, 10–20 mm moderate, over 20 mm large (Klein 2013 · PMID 23998693). Say where it is.</li>' +
-    '<li><b>Collapse</b>: freeze and step through the cycle. RA inversion in late diastole lasting more than a third of the cycle; RV free-wall inversion in early diastole (mitral valve open).</li>' +
-    '<li><b>IVC</b>: over 21 mm with under 50% collapse is present in over 90% of tamponade, but is not specific (Klein 2013 · PMID 23998693; Session 5 simulator).</li>' +
-    '<li><b>Clinical correlation</b>: blood pressure, heart rate, JVP, ventilation. Tamponade is judged clinically, with echocardiography the key supporting test (ESC 2015, Adler · PMID 26320112).</li>' +
+    '<li><b>Size</b> the largest pocket at end-diastole: under 10 mm mild (small), 10–20 mm moderate, over 20 mm large (ESC 2025 Table 10 · PMID 40878297). Say where it is.</li>' +
+    '<li><b>Collapse</b>: freeze and step through the cycle. RA inversion from late diastole into early systole lasting more than a third of the cycle (specificity 100%, ESC 2025 Table 17); RV free-wall inversion in early diastole (mitral valve open).</li>' +
+    '<li><b>IVC</b>: over 20 mm with under 50% respiratory change, with hepatic-vein dilatation: sensitivity 97%, specificity 40% (ESC 2025 Table 17 · PMID 40878297; Session 5 simulator).</li>' +
+    '<li><b>Clinical correlation</b>: blood pressure, heart rate, JVP, ventilation. Tamponade is judged clinically, with echocardiography the key supporting test (ESC 2025, Schulz-Menger · PMID 40878297).</li>' +
     '<li><b>Mimics</b>: epicardial fat, pleural effusion, ascites, loculated post-operative collections. Over-gain erases small effusions.</li>' +
     '<li><b>Escalate</b> on collapse signs or haemodynamic compromise; a stable large uraemic effusion is followed with comprehensive echo and intensified dialysis.</li></ol>' +
     '<h3>Heart failure and ventricular function</h3><ol>' +
-    '<li><b>PLAX</b> at the mitral tips, end-diastole: cavity size by eye against 42–58 mm (men) and 38–52 mm (women); wall thickness against 6–10 mm (men) and 6–9 mm (women) (Lang 2015 · PMID 25559473). Mitral opening against the septum (EPSS of 7 mm or less makes an EF of 30% or below unlikely; over 7 mm is not specific: McKaigney 2014 · PMID 24630604 ⚑, one emergency-department series).</li>' +
+    '<li><b>PLAX</b> at the mitral tips, end-diastole: cavity size by eye against 42–58 mm (men) and 38–52 mm (women); wall thickness against 6–10 mm (men) and 6–9 mm (women) (Lang 2015 · PMID 25559473). Mitral opening against the septum (EPSS of 7 mm or less makes an EF of 30% or below unlikely; over 7 mm is not specific: McKaigney 2014 · PMID 24630604, full text: one single-centre series of 80 patients who presented through the ED (71 analysed), only 8 with an EF of 30% or below).</li>' +
     '<li><b>PSAX mid-papillary</b>: global against regional squeeze; septal shape in systole and diastole.</li>' +
     '<li><b>A4C</b>: all walls, EF by category (normal, mildly, moderately, severely reduced), RV against LV size, atrial size.</li>' +
-    '<li><b>RV</b>: an RV larger than the LV is likely significantly enlarged (Rudski 2010 · PMID 20620859, qualitative); TAPSE under 17 mm is abnormal (Lang 2015).</li>' +
+    '<li><b>RV</b>: an RV basal diameter greater than the LV basal diameter is RV enlargement (Mukherjee 2025 · PMID 40044341, which replaces Rudski 2010); TAPSE under 17 mm is abnormal (Lang 2015; Mukherjee 2025 Table 1: normal over 1.7 cm).</li>' +
     '<li><b>Congestion</b>: IVC and VExUS (Session 5), B-lines (Session 3). This is where the dialysis decision is made.</li>' +
     '<li><b>Rhythm</b>: in AF or tachycardia estimate over several beats; use the slider and the AF switch here to see why.</li>' +
     '<li><b>Pitfalls</b>: foreshortening (round, thick apex), oblique PSAX, under-filling after dialysis mimicking hypertrophy or hyperdynamic failure.</li>' +
     '<li><b>Refer</b> for biplane EF, diastolic grading (Nagueh 2025 · PMID 40617625), valve quantitation.</li></ol>' +
     '<h3>Valves: screening in a focused study</h3><ol>' +
     '<li><b>2D first</b>: leaflet thickness, calcium and its shadow, mobility, and the chambers downstream (LA size, LV size and wall thickness, RV size).</li>' +
-    '<li><b>Colour</b>: box over the valve, Nyquist 50–60 cm/s, gain just below the level that speckles the tissue. A regurgitant jet appears on the far side of a closed valve in the right phase: systole for MR and TR, diastole for AR.</li>' +
+    '<li><b>Colour</b>: box over the valve, Nyquist 50–70 cm/s, colour gain just below the level that speckles the tissue (Zoghbi 2017). A regurgitant jet appears on the far side of a closed valve in the right phase: systole for MR and TR, diastole for AR.</li>' +
     '<li><b>Two views</b> before you believe a jet; describe its direction.</li>' +
     '<li><b>What a focused study cannot do</b>: grade severity. Severe AS is Vmax ≥4 m/s, mean gradient ≥40 mmHg, area under 1.0 cm² (Baumgartner 2017 · PMID 28385280); severe MR or TR has a vena contracta ≥7 mm and effective orifice ≥0.4 cm²; severe AR has a vena contracta over 6 mm and pressure half-time under 200 ms (Zoghbi 2017 · PMID 28314623). All need spectral Doppler (Session 6) in a comprehensive echo.</li>' +
     '<li><b>CKD patterns</b>: mitral annular and aortic valve calcification, functional MR and TR from dilated chambers, device-lead TR, endocarditis risk with catheters (a mobile mass on a leaflet is an urgent referral).</li>' +
     '<li><b>Pitfalls</b>: low gain hides jets, low Nyquist aliases normal inflow, wall-hugging jets look small, calcium shadows what lies behind it.</li></ol>' +
-    '<p class="pb-muted">⚑ = single emergency-department series, not a guideline threshold. The valve module previews Session 6 material for recognition only.</p>';
-  var foot = document.querySelector('.pb-foot'); mmSetup(); foot.parentNode.insertBefore(rc, foot); var rpc = reportCard(); foot.parentNode.insertBefore(rpc, rc); foot.parentNode.insertBefore(pc, rpc); foot.parentNode.insertBefore(card, pc); foot.parentNode.insertBefore(clipLibrary(), card);
+    '<p class="pb-muted">The EPSS figure comes from one emergency-department series, not a guideline threshold. The valve module previews Session 6 material for recognition only.</p>';
+  var foot = document.querySelector('.pb-foot'); mmSetup(); anatSetup(); clipSetup(); foot.parentNode.insertBefore(rc, foot); var rpc = reportCard(); foot.parentNode.insertBefore(rpc, rc); foot.parentNode.insertBefore(pc, rpc); foot.parentNode.insertBefore(card, pc); foot.parentNode.insertBefore(clipLibrary(), card);
   var ac = auditCard(); ac.hidden = !isReview(); foot.parentNode.insertBefore(ac, foot);
   function syncAudit() { ac.hidden = !isReview(); }
   window.addEventListener('hashchange', syncAudit); window.addEventListener('storage', syncAudit);
